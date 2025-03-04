@@ -19,6 +19,7 @@ public:
     Constructor function
     */
     Agent(char t = 'd', float p = 0) //setting default agent to defective. Might be a problem later
+    Agent(char t, float p)
         : trait (t)
         , payoff (p)
         {}
@@ -41,9 +42,42 @@ public:
 };
 
 /*
-A standard evolutionary prisoner's dilemma. We treat a player's strategy as being "programmed in"
-by their trait—either cooperative or defective. As is standard, we take payoffs T > R > P > S,
-and 2R > T+ S. See Hofbauer and Sigmund 1998 for details.
+I guess we make another object for the 'group' level.
+What is the most efficient way to structure it?
+e.g. what data structure do we use to store the members?
+Also, for interactions are we using methods or 'general' functions? 
+(not a CS student, correct me if I'm using the wrong terminology)
+*/
+
+class Group {
+    char trait; //'strategy' might be more accurate?
+    float payoff
+    //array of agents?
+
+    Group(char t, float p /*, array here */)
+    : trait (t)
+    , payoff (p)
+    {}
+
+    void setTrait(char newTrait) {
+        trait = newTrait;
+    }
+
+    char getTrait(){
+        return trait;
+    }
+
+    void setPayoff(float newPayoff) {
+        payoff = newPayoff;
+    }
+
+    float getPayoff(){
+        return payoff;
+    }
+}
+
+/*
+Define how the game works
 */
 void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
     /*
