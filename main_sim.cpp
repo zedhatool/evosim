@@ -51,12 +51,14 @@ Also, for interactions are we using methods or 'general' functions?
 
 class Group {
     char trait; //'strategy' might be more accurate?
-    float payoff
+    float payoff;
+    std::vector<Agent> agents;
     //array of agents?
 
-    Group(char t, float p /*, array here */)
+    Group(char t, float p, std::vector<Agent> a)
     : trait (t)
     , payoff (p)
+    , agents (a)
     {}
 
     void setTrait(char newTrait) {
@@ -74,6 +76,16 @@ class Group {
     float getPayoff(){
         return payoff;
     }
+
+    void addAgent(Agent a) {
+        agents.push_back(a);
+    }
+
+    void removeAgent(Agent a) {
+        agents.erase(find(agents.begin(), agents.end(), a));
+
+        // TODO: add agent vector init here
+    }    
 }
 
 /*
