@@ -3,7 +3,7 @@ This is a replication of the algorithm found here.
 https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 */
 
-#include <iostream>
+#include <iostream> //where can I install this package?
 
 /*
 Define the structure of an agent
@@ -37,6 +37,41 @@ public:
         return payoff;
     }
 };
+
+/*
+I guess we make another object for the 'group' level.
+What is the most efficient way to structure it?
+e.g. what data structure do we use to store the members?
+Also, for interactions are we using methods or 'general' functions? 
+(not a CS student, correct me if I'm using the wrong terminology)
+*/
+
+class Group {
+    char trait; //'strategy' might be more accurate?
+    float payoff
+    //array of agents?
+
+    Group(char t, float p /*, array here */)
+    : trait (t)
+    , payoff (p)
+    {}
+
+    void setTrait(char newTrait) {
+        trait = newTrait;
+    }
+
+    char getTrait(){
+        return trait;
+    }
+
+    void setPayoff(float newPayoff) {
+        payoff = newPayoff;
+    }
+
+    float getPayoff(){
+        return payoff;
+    }
+}
 
 /*
 Define how the game works
