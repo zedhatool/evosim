@@ -8,6 +8,11 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 #include <vector>
 
 /*
+Storage place for our beautiful boys (aka global constants)
+*/
+const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
+
+/*
 Define the structure of an agent
 */
 
@@ -45,36 +50,73 @@ public:
 I guess we make another object for the 'group' level.
 What is the most efficient way to structure it?
 e.g. what data structure do we use to store the members?
-Also, for interactions are we using methods or 'general' functions? 
+Also, for interactions are we using methods or 'general' functions?
 (not a CS student, correct me if I'm using the wrong terminology)
 */
 
 class Group {
-    char trait; //'strategy' might be more accurate?
-    float payoff;
-    std::vector<Agent> agents;
-    //array of agents?
+public:
+    float proportionCooperative; //need to track this for when groups win conflicts
+    float taxRate; //Proportion of an agent's payoff which is redistributed to the group
+    float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
+    float totalPayoff; // total (not average!) payoff of agents in the group
+    std::vector<Agent> agents; //Should we make a variable tracking group size? Or just use .size() on the vector
 
-    Group(char t, float p, std::vector<Agent> a)
-    : trait (t)
-    , payoff (p)
+    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
+    : proportionCooperative (pCoop)
+    , taxRate (tRate)
+    , segmentationRate (sRate)
+    , totalPayoff (tPayoff)
     , agents (a)
     {}
 
-    void setTrait(char newTrait) {
-        trait = newTrait;
+    /*
+    This method updates the two variables which are functions of the group data, rather than things we define;
+    namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
+    */
+    void updateGroupData() {
+        size_t length (agents.size());
+        float dummyPayoff (0);
+        float dummyCoop (0);
+
+        float cost (0.5 * (sRate * sRate + tRate * tRate)); //institutions are costly, see algorithm description
+        /*
+        this^^ is the reason it is important that in the Prisoners dilemma 2R > T + S, otherwise groups
+        which are more defective will have higher payoffs. You can think of this as defecting and agreeing to split
+        the higher reward T + S instead of splitting 2R. See e.g. Hofbauer and Sigmund for more info.
+        */
+
+        for (size_t i = 0; i < length; ++i) {
+            dummyPayoff += (agents[i].getPayoff() - cost);
+
+            if (agents[i].getTrait() == 'c') { //is there a more efficient way to do this? I don't know
+                dummyCoop += 1;
+            }
+        }
+
+        dummyCoop /= (float)length; //uh I think this is fine
+        totalPayoff = dummyPayoff;
     }
 
-    char getTrait(){
-        return trait;
+    float getTotalPayoff() {
+        return totalPayoff;
     }
 
-    void setPayoff(float newPayoff) {
-        payoff = newPayoff;
+    float getPropCoop(){
+        return proportionCooperative;
     }
 
-    float getPayoff(){
-        return payoff;
+    float getTaxRate(){
+        return taxRate;
+    }
+
+    float getSegRate(){
+        return segmentationRate;
+    }
+
+    void setInstitutions(float& tR, float& sR) {
+        taxRate = tR;
+        segmentationRate = sR;
     }
 
     void addAgent(Agent a) {
@@ -85,11 +127,15 @@ class Group {
         agents.erase(find(agents.begin(), agents.end(), a));
 
         // TODO: add agent vector init here
-    }    
+    }
+
+    std::vector<Agent> getAgents() {
+        return agents;
+    }
 }
 
 /*
-Define how the game works
+Define how the game works for players. We will need to figure out how to use this to determine reproductive rate...
 */
 void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
     /*
@@ -119,6 +165,30 @@ void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
     }
 }
 
+/*
+Define how the game works for groups. Note that not every group participates in conflict, a group is drawn in
+with chance GROUP_CONFLICT_CHANCE (defined way above)
+*/
+void playGroupGame(Group& groupOne, Group& groupTwo) {
+    float payoffOne (groupOne.getTotalPayoff());
+    float payoffTwo (groupTwo.getTotalPayoff());
+
+    if (payoffOne >= payoffTwo) {//arbitrarily break ties in favor of group 1. randomize going forward?
+        groupTwo.setInstitutions(groupOne.getTaxRate(), groupOne.getSegRate()); //group 2 gets 1's institutions
+        /*
+        IMPORTANT: What needs to happen when one side wins is that we take the proportion of the winning group
+        that's cooperative, and use that to generate a number of new agents equal to the size of the losing group.
+        Then, we pool all the agents in the winning group with the new agents, and split the group in half randomly.
+        One half stays in the winning group, the other half takes over the losing group, and gets all the institutions
+        of the winning group. Making the institutions of the losing group the same is easy, the first part is the
+        harder part.
+        */
+    } //group one wins
+    else {
+        groupOne.setInstitutions(groupTwo.getTaxRate(), groupOne.getTaxRate());
+    } //group two wins
+}
+
 int main() {
     /*
     Actually running the simulation goes here, I am thinking I will have this save some data to a file so we
@@ -136,12 +206,18 @@ int main() {
     */
     std::vector<char> possibleTraits ('c', 'd'); //this is a vector for now because we might want to add more types
 
-    std::vector<Agent> group (10); //important that this have an even number of elements
-    size_t length  = group.size();
+    std::vector<Agent> agents (10); //important that this have an even number of elements
+    Group testGroupOne (0, 0, 0, agents);
+    Group testGroupTwo (0, 0, 0, agents);
 
+    size_t length  = testGroupOne.getAgents().size();
+
+    /*
+    Broke this and need to figure out how to make it work
+    */
     for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
         int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
-        group[i].setTrait(possibleTraits[randomIndex]);
+        testGroupOne.getAgents()[i].setTrait(possibleTraits[randomIndex]); //need a way of updating agents in-place
     }
 
     for (int j = 0; j < length - 1; ++j) {
