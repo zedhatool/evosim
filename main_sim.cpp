@@ -23,8 +23,7 @@ public:
     /*
     Constructor function
     */
-    Agent(char t = 'd', float p = 0) //setting default agent to defective. Might be a problem later
-    Agent(char t, float p)
+    Agent(char t='d', float p=0)
         : trait (t)
         , payoff (p)
         {}
@@ -129,6 +128,14 @@ public:
         // TODO: add agent vector init here
     }
 
+    void updatePayoffByIndex(int index, float newPayoff) {
+        agents[i].setPayoff(newPayoff);
+    }
+
+    void updateTraitByIndex(int index, char newTrait) {
+        agents[i].setTrait(newTrait);
+    }
+
     std::vector<Agent> getAgents() {
         return agents;
     }
@@ -217,12 +224,14 @@ int main() {
     */
     for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
         int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
-        testGroupOne.getAgents()[i].setTrait(possibleTraits[randomIndex]); //need a way of updating agents in-place
+        testGroupOne.updateTraitByIndex(i, possibleTraits[randomIndex]); //randomize traits within the group
     }
 
+    testGroupOne.updateGroupData();
+
     for (int j = 0; j < length - 1; ++j) {
-        playPrisonersDilemma(group[j], group[j+1]);
-        std::cout << group[j].getPayoff() << std::endl;
+        playPrisonersDilemma(testGroupOne.getAgents()[j], testGroupOne.getAgents()[j+1]); //This doesn't work
+        std::cout << testGroupOne.getAgents()[j].getPayoff() << std::endl;
     }
 
     return 0;
