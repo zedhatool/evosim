@@ -143,12 +143,11 @@ public:
 
 /*
 Define how the game works for players. We will need to figure out how to use this to determine reproductive rate...
-*/
+Have this all commented out because I replaced it below with one that works for a Group. Keeping this in
+case we need it later.
+
 void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
-    /*
-    Defining these values so we can use them later. I chose smallish values because some of the transition
-    probabilities Bowles describes look small and I want to make sure payoffs don't overwhelm mutations.
-    */
+
     float suckersPayoff = 0; //S
     float temptationToDefect = 1; //T
     float rewardForCooperation = 0.6; //R
@@ -169,6 +168,38 @@ void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
     else {
         playerOne.setPayoff(temptationToDefect);
         playerTwo.setPayoff(suckersPayoff); //reverse of case 2
+    }
+}
+*/
+void playPrisonersDilemma(&Group group) {
+    /*
+    Defining these values so we can use them later. I chose smallish values because some of the transition
+    probabilities Bowles describes look small and I want to make sure payoffs don't overwhelm mutations.
+    */
+    float suckersPayoff = 0; //S
+    float temptationToDefect = 1; //T
+    float rewardForCooperation = 0.6; //R
+    float mutualPunishment = 0.3; //P
+
+    size_t length (group.getAgents().size());
+
+    for (size_t i (0); i < length - 1; ++i) {
+        if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i + 1].getTrait() == 'c') {
+            group.updatePayoffByIndex(i, rewardForCooperation);
+            group.updatePayoffByIndex(i+1, rewardForCooperation); //case 1, both cooperate
+        }
+        else if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i+1].getTrait() == 'd') {
+            group.updatePayoffByIndex(i, suckersPayoff);
+            group.updatePayoffByIndex(i+1, temptationToDefect); //case 2, p1 coop p2 defect
+        }
+        else if (group.getAgents()[i].getTrait() == 'd' && group.getAgents()[i+1].getTrait() == 'd') {
+            group.updatePayoffByIndex(i, mutualPunishment);
+            group.updatePayoffByIndex(i+1, mutualPunishment); //case 3, both defect
+        }
+        else {
+            group.updatePayoffByIndex(i, temptationToDefect);
+            group.updatePayoffByIndex(i+1, suckersPayoff); //reverse of case 2
+        }
     }
 }
 
