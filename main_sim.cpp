@@ -24,10 +24,10 @@ public:
     /*
     Constructor function
     */
-    Agent(char t='d', float p=0)
-        : trait (t)
-        , payoff (p)
-        {}
+    Agent(char t, float p) {
+        trait = t;
+        payoff = p;
+    }
 
     void setTrait(char newTrait) {
         trait = newTrait;
@@ -64,27 +64,39 @@ public:
     std::vector<Agent> agents;
 
     //Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
-    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, size_t gSize = 10)
-    : proportionCooperative (pCoop)
-    , taxRate (tRate)
-    , segmentationRate (sRate)
-    , totalPayoff (tPayoff)
-    , groupSize (gSize)
-    {initAgents(gSize);} //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
+    Group(float pCoop, float tRate, float sRate, float tPayoff, size_t gSize) {
+      proportionCooperative = pCoop;
+      taxRate = tRate;
+      segmentationRate = sRate;
+      totalPayoff = tPayoff;
+      groupSize = gSize;
+      initAgents(groupSize);
+    }
+
+    Group() {
+        proportionCooperative = 0;
+        taxRate = 0;
+        segmentationRate = 0;
+        totalPayoff = 0;
+        groupSize = 0;
+        } //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
 
     void initAgents(size_t numAgents) {
         //get the number of agents who are cooperative based on groupSize and propCoop
         size_t num_cooperative = groupSize * (size_t) proportionCooperative;
 
-        std::vector<Agent> agents (numAgents);
+        std::vector<Agent> agentsTemp;
         for (int i = 0; i < numAgents; ++i) {
             if (i <= num_cooperative) {
-                agents[i].setTrait('c');
+                Agent agent ('c', 0);
+                agentsTemp.push_back(agent);
             }
             else {
-                agents[i].setTrait('d');
+                Agent agent ('d', 0);
+                agentsTemp.push_back(agent);
             }
         }
+        agents = agentsTemp;
     }
 
     size_t getSize() {
@@ -228,10 +240,11 @@ void playWithinGroup(Group& group) {
     //first pooling according to the segmentation rate
     for (size_t j (0); j < length; ++j) {
         //compare uniform random number between 0 and 1 against segmentation rate.
-        if (dis(randomizer) >= group.getSegRate() && group.getAgents()[j].getTrait() == 'c') {
+        float randResult = dis(randomizer);
+        if (randResult <= group.getSegRate() && group.getAgents()[j].getTrait() == 'c') {
             cooperators.push_back(j);
         } //cooperators get paired with probability = segmentation rate
-        else if (dis(randomizer) >= group.getSegRate() && group.getAgents()[j].getTrait() == 'd') {
+        else if (randResult <= group.getSegRate() && group.getAgents()[j].getTrait() == 'd') {
             defectors.push_back(j);
         } //defectors get paired with probability = segmentation rate
         else {
@@ -259,8 +272,7 @@ void playWithinGroup(Group& group) {
         randomPool.erase(randomPool.begin() + rpLength - 1);
     }
 
-    //Getting a segmentation fault. I've tracked it down to here, but I don't know what's causing it.
-    for (size_t m (0); m < rpLength - 3; m+=2) {
+    for (size_t m (0); m < rpLength - 1; m+=2) {
         if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'c') {
             group.updatePayoffByIndex(m, rewardForCooperation);
             group.updatePayoffByIndex(m+1, rewardForCooperation); //case 1, both cooperate
@@ -324,13 +336,13 @@ int main() {
     float totalPayoff; // total (not average!) payoff of agents in the group
     size_t groupSize;
     */
-    Group groupOne (20, 0.3, 0.4, 100);
-    Group groupTwo (40, 0.2, 0.7, 100);
+    Group groupOne (20, 0.3, 0.4, 0, 100);
+    Group groupTwo (40, 0.2, 0.7, 0, 100);
 
     playWithinGroup(groupOne);
     playWithinGroup(groupTwo);
 
-    //playGroupGame(groupOne, groupTwo);
+    playGroupGame(groupOne, groupTwo);
 
     /*
     Actually running the simulation goes here, I am thinking I will have this save some data to a file so we
