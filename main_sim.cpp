@@ -6,6 +6,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 #include <iostream>
 #include <random>
 #include <vector>
+#include <numeric>
 
 /*
 Storage place for our beautiful boys (aka global constants)
@@ -142,9 +143,7 @@ public:
 }
 
 /*
-Define how the game works for players. We will need to figure out how to use this to determine reproductive rate...
-Have this all commented out because I replaced it below with one that works for a Group. Keeping this in
-case we need it later.
+Define how the game works for players. We maybe should get rid of this
 
 void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
 
@@ -171,7 +170,8 @@ void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
     }
 }
 */
-void playPrisonersDilemma(&Group group) {
+
+void playWithinGroup(&Group group) {
     /*
     Defining these values so we can use them later. I chose smallish values because some of the transition
     probabilities Bowles describes look small and I want to make sure payoffs don't overwhelm mutations.
@@ -181,24 +181,62 @@ void playPrisonersDilemma(&Group group) {
     float rewardForCooperation = 0.6; //R
     float mutualPunishment = 0.3; //P
 
+    /*
+    Randomness in pairings. Create three pools, then randomize the third pool and play the game within
+    groups
+    */
+    std::mt19937 mt{}; //for good (pseudo) randomness
+    std::uniform_real_distribution<> dis(0.0, 1.0); //uniform distribution on [0, 1]
+    vec<size_t> cooperators; //the indices corresponding to cooperators who are paired
+    vec<size_t> defectors;
+    vec<size_t> randomPool;
+
     size_t length (group.getAgents().size());
 
-    for (size_t i (0); i < length - 1; ++i) {
-        if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i + 1].getTrait() == 'c') {
-            group.updatePayoffByIndex(i, rewardForCooperation);
-            group.updatePayoffByIndex(i+1, rewardForCooperation); //case 1, both cooperate
+    //first pooling according to the segmentation rate
+    for (size_t j (0); j < length; ++j) {
+        //compare uniform random number between 0 and 1 against segmentation rate.
+        if (dis(mt) > = group.getSegRate() && group.getAgents()[j].getTrait() == 'c') {
+            cooperators.push_back(j);
+        } //cooperators get paired with probability = segmentation rate
+        else if (dis(mt) > = group.getSegRate() && group.getAgents()[j].getTrait() == 'd') {
+            defectors.push_back(group.getAgents()[j]);
+        } //defectors get paired with probability = segmentation rate
+        else {
+            randomPool.push_back(group.getAgents()[j]);
+        } //pair those who weren't segmented into a group that itself gets randomized
+    }
+    //now shuffle the randomPool by randomly permuting the elements
+    std::shuffle(randomPool.begin(), randomPool.end(), mt);
+
+    //now play the game for every collection of indices
+
+    for (size_t k (0); k < cooperators.size(); ++k) {
+        group.updatePayoffByIndex(cooperators[k], rewardForCooperation);
+    }
+
+    for (size_t l (0); l < defectors.size(); ++l) {
+        group.updatePayoffByIndex(defectors[k], mutualPunishment);
+    }
+
+    size_t rpLength (randomPool.size());
+
+    for (size_t m (0); m < rPLength - 1; m += 2) {
+        if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m + 1].getTrait() == 'c') {
+            group.updatePayoffByIndex(m, rewardForCooperation);
+            group.updatePayoffByIndex(m+1, rewardForCooperation); //case 1, both cooperate
         }
-        else if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i+1].getTrait() == 'd') {
-            group.updatePayoffByIndex(i, suckersPayoff);
-            group.updatePayoffByIndex(i+1, temptationToDefect); //case 2, p1 coop p2 defect
+        else if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'd') {
+            group.updatePayoffByIndex(m, suckersPayoff);
+            group.updatePayoffByIndex(m+1, temptationToDefect); //case 2, p1 coop p2 defect
         }
         else if (group.getAgents()[i].getTrait() == 'd' && group.getAgents()[i+1].getTrait() == 'd') {
-            group.updatePayoffByIndex(i, mutualPunishment);
-            group.updatePayoffByIndex(i+1, mutualPunishment); //case 3, both defect
+            group.updatePayoffByIndex(m, mutualPunishment);
+            group.updatePayoffByIndex(m+1, mutualPunishment); //case 3, both defect
         }
         else {
-            group.updatePayoffByIndex(i, temptationToDefect);
-            group.updatePayoffByIndex(i+1, suckersPayoff); //reverse of case 2
+            group.updatePayoffByIndex(m, temptationToDefect);
+            group.updatePayoffByIndex(m+1, suckersPayoff); //reverse of case 2
         }
     }
 }
