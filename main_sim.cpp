@@ -61,7 +61,7 @@ public:
     float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
     float totalPayoff; // total (not average!) payoff of agents in the group
     size_t groupSize;
-    std::vector<Agent> agents; //Should we make a variable tracking group size? Or just use .size() on the vector
+    std::vector<Agent> agents;
 
     //Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
     Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, size_t gSize = 10)
@@ -70,18 +70,20 @@ public:
     , segmentationRate (sRate)
     , totalPayoff (tPayoff)
     , groupSize (gSize)
-    {initAgents(gSize)} //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
+    {initAgents(gSize);} //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
 
-    /*
-    This method updates the two variables which are functions of the group data, rather than things we define;
-    namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
-    */
-    
     void initAgents(size_t numAgents) {
-        std::vector<Agent> agents (numAgents)
-        for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
-            int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
-            testGroupOne.updateTraitByIndex(i, possibleTraits[randomIndex]); //randomize traits within the group
+        //get the number of agents who are cooperative based on groupSize and propCoop
+        size_t num_cooperative = groupSize * (size_t) proportionCooperative;
+
+        std::vector<Agent> agents (numAgents);
+        for (int i = 0; i < numAgents; ++i) {
+            if (i <= num_cooperative) {
+                agents[i].setTrait('c');
+            }
+            else {
+                agents[i].setTrait('d');
+            }
         }
     }
 
@@ -89,12 +91,17 @@ public:
         return groupSize;
     }
 
+    /*
+    This method updates the two variables which are functions of the group data, rather than things we define;
+    namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
+    */
+
     void updateGroupData() {
         size_t length (agents.size());
         float dummyPayoff (0);
         float dummyCoop (0);
 
-        float cost (0.5 * (sRate * sRate + tRate * tRate)); //institutions are costly, see algorithm description
+        float cost (0.5 * (segmentationRate * segmentationRate + taxRate * taxRate)); //institutions are costly, see algorithm description
         /*
         this^^ is the reason it is important that in the Prisoners dilemma 2R > T + S, otherwise groups
         which are more defective will have higher payoffs. You can think of this as defecting and agreeing to split
@@ -111,6 +118,7 @@ public:
 
         dummyCoop /= (float)length; //uh I think this is fine
         totalPayoff = dummyPayoff;
+        groupSize = agents.size();
     }
 
     float getTotalPayoff() {
@@ -129,7 +137,7 @@ public:
         return segmentationRate;
     }
 
-    void setInstitutions(float& tR, float& sR) {
+    void setInstitutions(float tR, float sR) {
         taxRate = tR;
         segmentationRate = sR;
     }
@@ -139,24 +147,30 @@ public:
         groupSize++;
     }
 
+    /*
     void removeAgent(Agent a) {
         agents.erase(find(agents.begin(), agents.end(), a));
         groupSize--;
         // TODO: add agent vector init here
     }
+    */
 
-    void updatePayoffByIndex(int index, float newPayoff) {
-        agents[i].setPayoff(newPayoff);
+    void updatePayoffByIndex(size_t index, float newPayoff) {
+        agents[index].setPayoff(newPayoff);
     }
 
-    void updateTraitByIndex(int index, char newTrait) {
-        agents[i].setTrait(newTrait);
+    void transferByIndex(size_t index, float transferAmount) {
+        agents[index].setPayoff(agents[index].getPayoff() + transferAmount);
+    }
+
+    void updateTraitByIndex(size_t index, char newTrait) {
+        agents[index].setTrait(newTrait);
     }
 
     std::vector<Agent> getAgents() {
         return agents;
     }
-}
+};
 
 /*
 Define how the game works for players. We maybe should get rid of this
@@ -187,7 +201,7 @@ void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
 }
 */
 
-void playWithinGroup(&Group group) {
+void playWithinGroup(Group& group) {
     /*
     Defining these values so we can use them later. I chose smallish values because some of the transition
     probabilities Bowles describes look small and I want to make sure payoffs don't overwhelm mutations.
@@ -196,64 +210,84 @@ void playWithinGroup(&Group group) {
     float temptationToDefect = 1; //T
     float rewardForCooperation = 0.6; //R
     float mutualPunishment = 0.3; //P
+    float taxPool = 0;
+    float T = group.getTaxRate();
 
     /*
     Randomness in pairings. Create three pools, then randomize the third pool and play the game within
     groups
     */
-    std::mt19937 mt{}; //for good (pseudo) randomness
+    std::mt19937 randomizer; //for good (pseudo) randomness
     std::uniform_real_distribution<> dis(0.0, 1.0); //uniform distribution on [0, 1]
-    vec<size_t> cooperators; //the indices corresponding to cooperators who are paired
-    vec<size_t> defectors;
-    vec<size_t> randomPool;
+    std::vector<size_t> cooperators; //the indices corresponding to cooperators who are paired
+    std::vector<size_t> defectors;
+    std::vector<size_t> randomPool;
 
     size_t length (group.getAgents().size());
 
     //first pooling according to the segmentation rate
     for (size_t j (0); j < length; ++j) {
         //compare uniform random number between 0 and 1 against segmentation rate.
-        if (dis(mt) > = group.getSegRate() && group.getAgents()[j].getTrait() == 'c') {
+        if (dis(randomizer) >= group.getSegRate() && group.getAgents()[j].getTrait() == 'c') {
             cooperators.push_back(j);
         } //cooperators get paired with probability = segmentation rate
-        else if (dis(mt) > = group.getSegRate() && group.getAgents()[j].getTrait() == 'd') {
-            defectors.push_back(group.getAgents()[j]);
+        else if (dis(randomizer) >= group.getSegRate() && group.getAgents()[j].getTrait() == 'd') {
+            defectors.push_back(j);
         } //defectors get paired with probability = segmentation rate
         else {
-            randomPool.push_back(group.getAgents()[j]);
+            randomPool.push_back(j);
         } //pair those who weren't segmented into a group that itself gets randomized
     }
     //now shuffle the randomPool by randomly permuting the elements
-    std::shuffle(randomPool.begin(), randomPool.end(), mt);
+    std::shuffle(randomPool.begin(), randomPool.end(), randomizer);
 
     //now play the game for every collection of indices
 
     for (size_t k (0); k < cooperators.size(); ++k) {
-        group.updatePayoffByIndex(cooperators[k], rewardForCooperation);
+        group.updatePayoffByIndex(cooperators[k], (1 - T) * rewardForCooperation); //1 - T removes taxes
+        taxPool += 2 * T * rewardForCooperation;
     }
 
     for (size_t l (0); l < defectors.size(); ++l) {
-        group.updatePayoffByIndex(defectors[k], mutualPunishment);
+        group.updatePayoffByIndex(defectors[l], (1 - T) * mutualPunishment);
+        taxPool += 2 * T * mutualPunishment;
     }
 
     size_t rpLength (randomPool.size());
 
-    for (size_t m (0); m < rPLength - 1; m += 2) {
-        if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m + 1].getTrait() == 'c') {
+    if (rpLength % 2 != 0) {
+        randomPool.erase(randomPool.begin() + rpLength - 1);
+    }
+
+    //Getting a segmentation fault. I've tracked it down to here, but I don't know what's causing it.
+    for (size_t m (0); m < rpLength - 3; m+=2) {
+        if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'c') {
             group.updatePayoffByIndex(m, rewardForCooperation);
             group.updatePayoffByIndex(m+1, rewardForCooperation); //case 1, both cooperate
+            taxPool += 2 * T * (rewardForCooperation);
         }
         else if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'd') {
             group.updatePayoffByIndex(m, suckersPayoff);
             group.updatePayoffByIndex(m+1, temptationToDefect); //case 2, p1 coop p2 defect
+            taxPool += T * (suckersPayoff + temptationToDefect);
         }
-        else if (group.getAgents()[i].getTrait() == 'd' && group.getAgents()[i+1].getTrait() == 'd') {
+        else if (group.getAgents()[m].getTrait() == 'd' && group.getAgents()[m+1].getTrait() == 'd') {
             group.updatePayoffByIndex(m, mutualPunishment);
             group.updatePayoffByIndex(m+1, mutualPunishment); //case 3, both defect
+            taxPool += 2 * T * (mutualPunishment);
         }
         else {
             group.updatePayoffByIndex(m, temptationToDefect);
             group.updatePayoffByIndex(m+1, suckersPayoff); //reverse of case 2
+            taxPool += T * (suckersPayoff + temptationToDefect);
         }
+    }
+
+
+    float transfer = taxPool / group.getAgents().size();
+
+    for (size_t n (0); n < length; ++n) {
+        group.transferByIndex(n, transfer); //add transfer amount to everyone in the group's payoff
     }
 }
 
@@ -283,9 +317,25 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
 
 int main() {
     /*
+    Test of the two games. Recall that we initialize a group with
+    float proportionCooperative; //need to track this for when groups win conflicts
+    float taxRate; //Proportion of an agent's payoff which is redistributed to the group
+    float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
+    float totalPayoff; // total (not average!) payoff of agents in the group
+    size_t groupSize;
+    */
+    Group groupOne (20, 0.3, 0.4, 100);
+    Group groupTwo (40, 0.2, 0.7, 100);
+
+    playWithinGroup(groupOne);
+    playWithinGroup(groupTwo);
+
+    //playGroupGame(groupOne, groupTwo);
+
+    /*
     Actually running the simulation goes here, I am thinking I will have this save some data to a file so we
     can plot and analyze it in python with standard analysis tools.
-    */
+
     Agent testOne ('c', 0);
     Agent testTwo ('d', 0);
     playPrisonersDilemma(testOne, testTwo);
@@ -296,6 +346,7 @@ int main() {
     turn this into its own function because we will be running it many times but for now this is an idea of
     how the within-group dynamics will work
     */
+    /*
     std::vector<char> possibleTraits ('c', 'd'); //this is a vector for now because we might want to add more types
 
     //std::vector<Agent> agents (10); //important that this have an even number of elements
@@ -303,7 +354,7 @@ int main() {
     Group testGroupTwo (0, 0, 0, 10);
 
     size_t length  = testGroupOne.getSize();
-
+    */
     /*
     Broke this and need to figure out how to make it work
     */
@@ -315,13 +366,17 @@ int main() {
     }
 
     testGroupOne.updateGroupData();
-    */
-   
+
+
     for (int j = 0; j < length - 1; ++j) {
         playPrisonersDilemma(testGroupOne.getAgents()[j], testGroupOne.getAgents()[j+1]); //This doesn't work <- I think it's because we hve redefined it to take a group as input, but here we are inputting Agents? Maybe we should have groupGames and individualGames?
         std::cout << testGroupOne.getAgents()[j].getPayoff() << std::endl;
     }
-    
+    */
+
+    for (int p (0); p < groupOne.getAgents().size(); ++p) {
+        std::cout  << groupOne.getAgents()[p].getPayoff() << std::endl;
+    }
 
     return 0;
 }
