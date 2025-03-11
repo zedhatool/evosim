@@ -12,6 +12,8 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 Storage place for our beautiful boys (aka global constants)
 */
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
+const float INDIVIDUAL_MUTATION_RATE (0.001); //benchmark from BCH, will need to do parameter search
+const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
 
 /*
 Define the structure of an agent
@@ -33,7 +35,7 @@ public:
         trait = newTrait;
     }
 
-    char getTrait(){
+    char getTrait() const{
         return trait;
     }
 
@@ -41,8 +43,13 @@ public:
         payoff = newPayoff;
     }
 
-    float getPayoff(){
+    float getPayoff() const{
         return payoff;
+    }
+
+    Agent operator= (const Agent &other) {
+        Agent agent (other.getTrait(), other.getPayoff());
+        return agent;
     }
 };
 
@@ -159,6 +166,7 @@ public:
         groupSize++;
     }
 
+    //this is giving some kind of strange error
     /*
     void removeAgent(Agent a) {
         agents.erase(find(agents.begin(), agents.end(), a));
@@ -184,34 +192,6 @@ public:
     }
 };
 
-/*
-Define how the game works for players. We maybe should get rid of this
-
-void playPrisonersDilemma(Agent& playerOne, Agent& playerTwo) {
-
-    float suckersPayoff = 0; //S
-    float temptationToDefect = 1; //T
-    float rewardForCooperation = 0.6; //R
-    float mutualPunishment = 0.3; //P
-
-    if (playerOne.getTrait() == 'c' && playerTwo.getTrait() == 'c') {
-        playerOne.setPayoff(rewardForCooperation);
-        playerTwo.setPayoff(rewardForCooperation); //case 1, both cooperate
-    }
-    else if (playerOne.getTrait() == 'c' && playerTwo.getTrait() == 'd') {
-        playerOne.setPayoff(suckersPayoff);
-        playerTwo.setPayoff(temptationToDefect); //case 2, p1 coop p2 defect
-    }
-    else if (playerOne.getTrait() == 'd' && playerTwo.getTrait() == 'd') {
-        playerOne.setPayoff(mutualPunishment);
-        playerTwo.setPayoff(mutualPunishment); //case 3, both defect
-    }
-    else {
-        playerOne.setPayoff(temptationToDefect);
-        playerTwo.setPayoff(suckersPayoff); //reverse of case 2
-    }
-}
-*/
 
 void playWithinGroup(Group& group) {
     /*
@@ -304,6 +284,70 @@ void playWithinGroup(Group& group) {
 }
 
 /*
+Step 3b and 3c of the algorithm
+*/
+void haveChildren(Group& group) {
+    std::mt19937 randomizer;
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+    float total = group.getTotalPayoff();
+
+    size_t groupSize = group.getSize();
+    std::vector<int> subintervals;
+    std::vector<float> weights;
+
+    for (size_t i = 0; i <= groupSize; ++i) {
+        subintervals.push_back(i);
+    }
+    for (size_t j = 0; j < groupSize; ++j) {
+        float pj = group.getAgents()[j].getPayoff();
+        weights.push_back(pj / total);
+    }
+
+    //This defines a probability mass function on subintervals given by the indices of agents
+    std::piecewise_constant_distribution<> d(subintervals.begin(), subintervals.end(), weights.begin());
+
+    size_t sexHavers = 0;
+
+    while (sexHavers < groupSize) {
+        float randResult = d(randomizer);
+        size_t randIndex = (size_t) randResult;
+        Agent agent = group.getAgents()[randIndex];
+        float mutation = dis(randomizer);
+
+        //individual mutation chance for every agent
+        if (mutation <= INDIVIDUAL_MUTATION_RATE && agent.getTrait() == 'c') {
+            agent.setTrait('d');
+        }
+        else if (mutation <= INDIVIDUAL_MUTATION_RATE && agent.getTrait() == 'd') {
+            agent.setTrait('c');
+        }
+
+        group.addAgent(agent);
+
+        ++sexHavers;
+    }
+
+    std::uniform_int_distribution<> twoCoin(0, 3);
+    /*
+    0 = increase tax rate, increase seg rate
+    1 = increase tax rate, decrease seg rate
+    2 = decrease tax rate, increase seg rate
+    3 = decrease tax rate, decrease seg rate
+    */
+    int flips = twoCoin(randomizer);
+    float institutionalChange = dis(randomizer);
+    if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 0) {//1 = heads, increase
+        group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() + 0.1);
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1) {
+        group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() - 0.1);
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 2) {
+        group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() + 0.1);
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 3) {
+        group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
+    }
+}
+
+/*
 Define how the game works for groups. Note that not every group participates in conflict, a group is drawn in
 with chance GROUP_CONFLICT_CHANCE (defined way above)
 */
@@ -344,47 +388,8 @@ int main() {
 
     playGroupGame(groupOne, groupTwo);
 
-    /*
-    Actually running the simulation goes here, I am thinking I will have this save some data to a file so we
-    can plot and analyze it in python with standard analysis tools.
+    haveChildren(groupOne);
 
-    Agent testOne ('c', 0);
-    Agent testTwo ('d', 0);
-    playPrisonersDilemma(testOne, testTwo);
-    std::cout << testTwo.getPayoff() << std::endl; //this in fact returns 1 so the game works
-
-    /*
-    Below is code for running many prisoner's dilemmas on a vector of Agents. We probably will want to
-    turn this into its own function because we will be running it many times but for now this is an idea of
-    how the within-group dynamics will work
-    */
-    /*
-    std::vector<char> possibleTraits ('c', 'd'); //this is a vector for now because we might want to add more types
-
-    //std::vector<Agent> agents (10); //important that this have an even number of elements
-    Group testGroupOne (0, 0, 0, 10);
-    Group testGroupTwo (0, 0, 0, 10);
-
-    size_t length  = testGroupOne.getSize();
-    */
-    /*
-    Broke this and need to figure out how to make it work
-    */
-
-    /*
-    for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
-        int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
-        testGroupOne.updateTraitByIndex(i, possibleTraits[randomIndex]); //randomize traits within the group
-    }
-
-    testGroupOne.updateGroupData();
-
-
-    for (int j = 0; j < length - 1; ++j) {
-        playPrisonersDilemma(testGroupOne.getAgents()[j], testGroupOne.getAgents()[j+1]); //This doesn't work <- I think it's because we hve redefined it to take a group as input, but here we are inputting Agents? Maybe we should have groupGames and individualGames?
-        std::cout << testGroupOne.getAgents()[j].getPayoff() << std::endl;
-    }
-    */
 
     for (int p (0); p < groupOne.getAgents().size(); ++p) {
         std::cout  << groupOne.getAgents()[p].getPayoff() << std::endl;
