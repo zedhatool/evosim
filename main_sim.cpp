@@ -60,20 +60,35 @@ public:
     float taxRate; //Proportion of an agent's payoff which is redistributed to the group
     float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
     float totalPayoff; // total (not average!) payoff of agents in the group
+    size_t groupSize;
     std::vector<Agent> agents; //Should we make a variable tracking group size? Or just use .size() on the vector
 
-    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
+    //Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
+    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, size_t gSize = 10)
     : proportionCooperative (pCoop)
     , taxRate (tRate)
     , segmentationRate (sRate)
     , totalPayoff (tPayoff)
-    , agents (a)
-    {}
+    , groupSize (gSize)
+    {initAgents(gSize)} //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
 
     /*
     This method updates the two variables which are functions of the group data, rather than things we define;
     namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
     */
+    
+    void initAgents(size_t numAgents) {
+        std::vector<Agent> agents (numAgents)
+        for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
+            int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
+            testGroupOne.updateTraitByIndex(i, possibleTraits[randomIndex]); //randomize traits within the group
+        }
+    }
+
+    size_t getSize() {
+        return groupSize;
+    }
+
     void updateGroupData() {
         size_t length (agents.size());
         float dummyPayoff (0);
@@ -121,11 +136,12 @@ public:
 
     void addAgent(Agent a) {
         agents.push_back(a);
+        groupSize++;
     }
 
     void removeAgent(Agent a) {
         agents.erase(find(agents.begin(), agents.end(), a));
-
+        groupSize--;
         // TODO: add agent vector init here
     }
 
@@ -282,26 +298,30 @@ int main() {
     */
     std::vector<char> possibleTraits ('c', 'd'); //this is a vector for now because we might want to add more types
 
-    std::vector<Agent> agents (10); //important that this have an even number of elements
-    Group testGroupOne (0, 0, 0, agents);
-    Group testGroupTwo (0, 0, 0, agents);
+    //std::vector<Agent> agents (10); //important that this have an even number of elements
+    Group testGroupOne (0, 0, 0, 10);
+    Group testGroupTwo (0, 0, 0, 10);
 
-    size_t length  = testGroupOne.getAgents().size();
+    size_t length  = testGroupOne.getSize();
 
     /*
     Broke this and need to figure out how to make it work
     */
+
+    /*
     for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
         int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
         testGroupOne.updateTraitByIndex(i, possibleTraits[randomIndex]); //randomize traits within the group
     }
 
     testGroupOne.updateGroupData();
-
+    */
+   
     for (int j = 0; j < length - 1; ++j) {
-        playPrisonersDilemma(testGroupOne.getAgents()[j], testGroupOne.getAgents()[j+1]); //This doesn't work
+        playPrisonersDilemma(testGroupOne.getAgents()[j], testGroupOne.getAgents()[j+1]); //This doesn't work <- I think it's because we hve redefined it to take a group as input, but here we are inputting Agents? Maybe we should have groupGames and individualGames?
         std::cout << testGroupOne.getAgents()[j].getPayoff() << std::endl;
     }
+    
 
     return 0;
 }
