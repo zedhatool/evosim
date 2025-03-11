@@ -59,24 +59,24 @@ public:
     float taxRate; //Proportion of an agent's payoff which is redistributed to the group
     float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
     float totalPayoff; // total (not average!) payoff of agents in the group
-    int groupSize;
+    size_t groupSize;
     std::vector<Agent> agents; //Should we make a variable tracking group size? Or just use .size() on the vector
 
     //Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, std::vector<Agent> a)
-    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, int gSize = 10)
+    Group(float pCoop = 0, float tRate = 0, float sRate = 0, float tPayoff = 0, size_t gSize = 10)
     : proportionCooperative (pCoop)
     , taxRate (tRate)
     , segmentationRate (sRate)
     , totalPayoff (tPayoff)
     , groupSize (gSize)
-    {initAgents(gSize)}
+    {initAgents(gSize)} //I thought it might be a good idea to move agent initialization to a method within the Group class, but let me know if there's a problem with this
 
     /*
     This method updates the two variables which are functions of the group data, rather than things we define;
     namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
     */
     
-    void initAgents(int numAgents) {
+    void initAgents(size_t numAgents) {
         std::vector<Agent> agents (numAgents)
         for (int i = 0; i < length; ++i) { //will need to find a better way to do this in the future
             int randomIndex = rand() % 2; //pick a random trait, this returns either 0 or 1
@@ -84,7 +84,7 @@ public:
         }
     }
 
-    int getSize() {
+    size_t getSize() {
         return groupSize;
     }
 
