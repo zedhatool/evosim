@@ -4,6 +4,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 */
 
 #include <iostream>
+#include <fstream>
 #include <random>
 #include <vector>
 #include <numeric>
@@ -14,6 +15,9 @@ Storage place for our beautiful boys (aka global constants)
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
 const float INDIVIDUAL_MUTATION_RATE (0.001); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
+const int INITIAL_GROUPS = 10; //I randomly chose ten. We can change this later
+const int INITIAL_AGENTS = 20 * INITIAL_GROUPS; //benchmark value is this is 20*INITIAL_GROUPS
+const int GROUP_SIZE_LOWER_BOUND = 4; //from BCH. Makes sense because that way there are 2 PD pairings
 
 /*
 Define the structure of an agent
@@ -190,6 +194,10 @@ public:
     std::vector<Agent> getAgents() {
         return agents;
     }
+
+    void overhaulAgents(std::vector<Agent> newAgents) {
+        agents = newAgents;
+    }
 };
 
 
@@ -354,46 +362,149 @@ with chance GROUP_CONFLICT_CHANCE (defined way above)
 void playGroupGame(Group& groupOne, Group& groupTwo) {
     float payoffOne (groupOne.getTotalPayoff());
     float payoffTwo (groupTwo.getTotalPayoff());
+    std::vector<Agent> pool;
 
     if (payoffOne >= payoffTwo) {//arbitrarily break ties in favor of group 1. randomize going forward?
         groupTwo.setInstitutions(groupOne.getTaxRate(), groupOne.getSegRate()); //group 2 gets 1's institutions
+
+        size_t poolSize (groupTwo.getAgents().size());
+        size_t numCoop = poolSize * (size_t) groupOne.getPropCoop();
+
         /*
-        IMPORTANT: What needs to happen when one side wins is that we take the proportion of the winning group
-        that's cooperative, and use that to generate a number of new agents equal to the size of the losing group.
-        Then, we pool all the agents in the winning group with the new agents, and split the group in half randomly.
-        One half stays in the winning group, the other half takes over the losing group, and gets all the institutions
-        of the winning group. Making the institutions of the losing group the same is easy, the first part is the
-        harder part.
+            We generate a bunch of agents which look like those in group one and repopulate group 2 with
+            the new agents
         */
+        for (size_t i (0); i < poolSize; ++i) {
+            if (i < numCoop) {
+                Agent agent('c', 0);
+                pool.push_back(agent);
+            }
+            else {
+                Agent agent ('d', 0);
+                pool.push_back(agent);
+            }
+        }
+        groupTwo.overhaulAgents(pool);
+        groupTwo.updateGroupData();
     } //group one wins
     else {
         groupOne.setInstitutions(groupTwo.getTaxRate(), groupOne.getTaxRate());
+
+        size_t poolSize (groupOne.getAgents().size());
+        size_t numCoop = poolSize * (size_t) groupTwo.getPropCoop();
+
+        /*
+            We generate a bunch of agents which look like those in group one and repopulate group 2 with
+            the new agents
+        */
+        for (size_t i (0); i < poolSize; ++i) {
+            if (i < numCoop) {
+                Agent agent('c', 0);
+                pool.push_back(agent);
+            }
+            else {
+                Agent agent ('d', 0);
+                pool.push_back(agent);
+            }
+        }
+        groupOne.overhaulAgents(pool);
+        groupOne.updateGroupData();
     } //group two wins
 }
 
 int main() {
     /*
-    Test of the two games. Recall that we initialize a group with
-    float proportionCooperative; //need to track this for when groups win conflicts
-    float taxRate; //Proportion of an agent's payoff which is redistributed to the group
-    float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
-    float totalPayoff; // total (not average!) payoff of agents in the group
-    size_t groupSize;
+    Getting the main simulation up and running
     */
-    Group groupOne (20, 0.3, 0.4, 0, 100);
-    Group groupTwo (40, 0.2, 0.7, 0, 100);
 
-    playWithinGroup(groupOne);
-    playWithinGroup(groupTwo);
+    //Start by creating a vector of groups
+    std::vector<Group> world (INITIAL_GROUPS);
 
-    playGroupGame(groupOne, groupTwo);
+    for (int i (0); i < INITIAL_GROUPS; ++i) {
+        // propCoop, taxRate, segRate, totalPayoff, groupSize
+        Group group (0, 0, 0, 0, 0); //setting groups to be of zero size for a second
 
-    haveChildren(groupOne);
-
-
-    for (int p (0); p < groupOne.getAgents().size(); ++p) {
-        std::cout  << groupOne.getAgents()[p].getPayoff() << std::endl;
     }
 
-    return 0;
-}
+    int agentsRemaining = INITIAL_AGENTS;
+
+    std::mt19937 randomizer;
+
+    int currentlyFilling (0);
+
+    /*
+    now fill each group in the vector with a random number of agents from the pool
+    NOTE: We will somehow need to make sure that if we get down to <4 agents we just put 4 agents in
+    the last group. Right now the last group doesn't have to have any agents.
+    */
+    while (agentsRemaining > GROUP_SIZE_LOWER_BOUND) {
+        /*
+        Every group needs to be of size 4, so no group can be larger than the number of agents remaining
+        minus 4 times the number of groups remaining
+        */
+        int groupSizeUpperBound (agentsRemaining - GROUP_SIZE_LOWER_BOUND * (INITIAL_GROUPS - currentlyFilling));
+        std::uniform_int_distribution<> d(4, groupSizeUpperBound);
+
+        int numAgents (d(randomizer));
+
+        for (int k (0); k < numAgents; ++k) { //I am SURE there is a more efficient way of doing this
+            Agent agent ('d', 0); //all agents begin defective and with 0 payoff
+            world[currentlyFilling].addAgent(agent);
+        }
+
+        ++currentlyFilling;
+    }
+
+    std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //how big is the war
+
+    //define the file output stuff
+    std::ofstream outf ("data.csv");
+    float pCoop;
+    float avgTRate;
+    float avgSRate;
+
+    if (!outf) {
+        std::cerr << "Well, cock. Some C++ nonsense means the file output didn't work.\n";
+        return 1;
+    }
+
+    outf << "Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate";
+
+    int iterations = 1000; //how many times to repeat the simulation
+    for (int j (0); j < iterations; ++j) { //Now run everything
+
+        //reset output values
+        pCoop = 0;
+        avgTRate = 0;
+        avgSRate = 0;
+
+            for (int k (0); k < INITIAL_GROUPS; ++k) { //Within-group phases
+            playWithinGroup(world[k]);
+            haveChildren(world[k]);
+            }
+
+            //for the war, shuffle the world and choose the first warSize groups
+            std::shuffle(world.begin(), world.end(), randomizer);
+            int warSize = war(randomizer);
+
+            if (warSize % 2 != 0) {
+                ++warSize;
+            }
+
+            for (int l (0); l < warSize - 1; l += 2) { //pretty sure this works
+                playGroupGame(world[l], world[l+1]);
+                pCoop += (world[l].getPropCoop() + world[l+1].getPropCoop());
+                avgTRate += (world[l].getTaxRate() + world[l+1].getTaxRate());
+                avgSRate += (world[l].getSegRate() + world[l+1].getSegRate());
+            }
+
+        pCoop /= INITIAL_GROUPS;
+        avgTRate /= INITIAL_GROUPS;
+        avgSRate /= INITIAL_GROUPS;
+
+        outf << pCoop << "," << avgTRate << "," << avgSRate << std::endl;
+
+        }
+        outf.close();
+        return 0;
+    }
