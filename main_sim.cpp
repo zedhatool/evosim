@@ -318,6 +318,8 @@ void haveChildren(Group& group) {
 
     size_t sexHavers = 0;
 
+    std::vector<Agent> childPool;
+
     while (sexHavers < groupSize) {
         float randResult = d(randomizer);
         size_t randIndex = (size_t) randResult;
@@ -332,10 +334,12 @@ void haveChildren(Group& group) {
             agent.setTrait('c');
         }
 
-        group.addAgent(agent);
+        childPool.push_back(agent);
 
         ++sexHavers;
     }
+
+    group.overhaulAgents(childPool);
 
     std::uniform_int_distribution<> twoCoin(0, 3);
     /*
