@@ -530,11 +530,21 @@ int main() {
                 ++warSize;
             }
 
-            for (int l (0); l < warSize - 1; l += 2) { //pretty sure this works
-                playGroupGame(world[l], world[l+1]);
-                pCoop += (world[l].getPropCoop() + world[l+1].getPropCoop());
-                avgTRate += (world[l].getTaxRate() + world[l+1].getTaxRate());
-                avgSRate += (world[l].getSegRate() + world[l+1].getSegRate());
+            int l (0); //this logic lets us use one loop instead of two
+            while (l < INITIAL_GROUPS) { //Let's have a war!
+                if (l < warSize - 1) {
+                    playGroupGame(world[l], world[l+1]);
+                    pCoop += (world[l].getPropCoop() + world[l+1].getPropCoop());
+                    avgTRate += (world[l].getTaxRate() + world[l+1].getTaxRate());
+                    avgSRate += (world[l].getSegRate() + world[l+1].getSegRate());
+                    l += 2;
+                }
+                else {
+                    pCoop += world[l].getPropCoop();
+                    avgTRate += world[l].getTaxRate();
+                    avgSRate += world[l].getSegRate();
+                    ++l;
+                }
             }
 
         pCoop /= (float) INITIAL_GROUPS;
