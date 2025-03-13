@@ -15,9 +15,9 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 Storage place for our beautiful boys (aka global constants)
 */
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
-const float INDIVIDUAL_MUTATION_RATE (0.001); //benchmark from BCH, will need to do parameter search
+const float INDIVIDUAL_MUTATION_RATE (0.01); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
-const int INITIAL_GROUPS = 10; //I randomly chose ten. We can change this later
+const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
 const int INITIAL_AGENTS = 20 * INITIAL_GROUPS; //benchmark value is this is 20*INITIAL_GROUPS
 const int GROUP_SIZE_LOWER_BOUND = 4; //from BCH. Makes sense because that way there are 2 PD pairings
 
@@ -142,6 +142,8 @@ public:
         }
 
         dummyCoop /= (float)length; //uh I think this is fine
+
+        proportionCooperative = dummyCoop;
         totalPayoff = dummyPayoff;
         groupSize = agents.size();
     }
@@ -219,7 +221,9 @@ void playWithinGroup(Group& group) {
     Randomness in pairings. Create three pools, then randomize the third pool and play the game within
     groups
     */
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::mt19937 randomizer; //for good (pseudo) randomness
+    randomizer.seed((unsigned long)seed);
     std::uniform_real_distribution<> dis(0.0, 1.0); //uniform distribution on [0, 1]
     std::vector<size_t> cooperators; //the indices corresponding to cooperators who are paired
     std::vector<size_t> defectors;
@@ -297,7 +301,9 @@ void playWithinGroup(Group& group) {
 Step 3b and 3c of the algorithm
 */
 void haveChildren(Group& group) {
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::mt19937 randomizer;
+    randomizer.seed((unsigned long)seed);
     std::uniform_real_distribution<> dis(0.0, 1.0);
     float total = group.getTotalPayoff();
 
@@ -350,6 +356,7 @@ void haveChildren(Group& group) {
     */
     int flips = twoCoin(randomizer);
     float institutionalChange = dis(randomizer);
+
     if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 0) {//1 = heads, increase
         group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() + 0.1);
     } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1) {
@@ -359,6 +366,7 @@ void haveChildren(Group& group) {
     } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 3) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
     }
+
 }
 
 /*
@@ -434,7 +442,9 @@ int main() {
 
     int agentsRemaining = INITIAL_AGENTS;
 
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::mt19937 randomizer;
+    randomizer.seed((unsigned long)seed);
 
     int currentlyFilling (0);
 
@@ -486,7 +496,7 @@ int main() {
         return 1;
     }
 
-    outf << "Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate";
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate" << std::endl;
 
 
     int iterations = 1000; //how many times to repeat the simulation
@@ -517,11 +527,11 @@ int main() {
                 avgSRate += (world[l].getSegRate() + world[l+1].getSegRate());
             }
 
-        pCoop /= INITIAL_GROUPS;
-        avgTRate /= INITIAL_GROUPS;
-        avgSRate /= INITIAL_GROUPS;
+        pCoop /= (float) INITIAL_GROUPS;
+        avgTRate /= (float) INITIAL_GROUPS;
+        avgSRate /= (float) INITIAL_GROUPS;
 
-        outf << pCoop << "," << avgTRate << "," << avgSRate << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << std::endl;
 
         }
         outf.close();
