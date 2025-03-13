@@ -16,7 +16,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 Storage place for our beautiful boys (aka global constants)
 */
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
-const float INDIVIDUAL_MUTATION_RATE (0.01); //benchmark from BCH, will need to do parameter search
+const float INDIVIDUAL_MUTATION_RATE (0.1); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
 const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
 const int INITIAL_AGENTS = 20 * INITIAL_GROUPS; //benchmark value is this is 20*INITIAL_GROUPS
@@ -36,6 +36,11 @@ public:
     Agent(char t, float p) {
         trait = t;
         payoff = p;
+    }
+
+    Agent() {
+        trait = 'd';
+        payoff = 0;
     }
 
     void setTrait(char newTrait) {
@@ -97,11 +102,11 @@ public:
 
     void initAgents(size_t numAgents) {
         //get the number of agents who are cooperative based on groupSize and propCoop
-        size_t num_cooperative = groupSize * (size_t) proportionCooperative;
+        int numCooperative = groupSize * (int) proportionCooperative;
 
         std::vector<Agent> agentsTemp;
         for (int i = 0; i < numAgents; ++i) {
-            if (i <= num_cooperative) {
+            if (i <= numCooperative) {
                 Agent agent ('c', 0);
                 agentsTemp.push_back(agent);
             }
@@ -262,11 +267,11 @@ void playWithinGroup(Group& group) {
     }
 
     int rpLength (randomPool.size());
-    std::cout << "The random pool length is " << rpLength << std::endl;
 
     //check if rpLength is odd
     if (rpLength % 2 != 0) {
-        randomPool.erase(find(randomPool.begin(), randomPool.end(), randomPool[rpLength - 1]));
+        randomPool.pop_back();
+        --rpLength; //make sure to actually reflect the fact that we changed the length of the random pool
     }
 
     if (rpLength > 0) {
@@ -365,11 +370,11 @@ void haveChildren(Group& group) {
 
     if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 0) {//1 = heads, increase
         group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() + 0.1);
-    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1) {
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1 && group.getSegRate() >= 0.1) {
         group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() - 0.1);
-    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 2) {
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 2  && group.getTaxRate() >= 0.1) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() + 0.1);
-    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 3) {
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 3 && group.getSegRate() >= 0.1 && group.getTaxRate() >= 0.1) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
     }
 
