@@ -10,6 +10,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 #include <numeric>
 #include <algorithm>
 #include <iterator>
+#include <chrono>
 
 /*
 Storage place for our beautiful boys (aka global constants)
@@ -260,35 +261,40 @@ void playWithinGroup(Group& group) {
         taxPool += 2 * T * mutualPunishment;
     }
 
-    size_t rpLength (randomPool.size());
+    int rpLength (randomPool.size());
+    std::cout << "The random pool length is " << rpLength << std::endl;
 
+    //check if rpLength is odd
     if (rpLength % 2 != 0) {
-        randomPool.erase(randomPool.begin() + rpLength - 1);
+        randomPool.erase(find(randomPool.begin(), randomPool.end(), randomPool[rpLength - 1]));
     }
 
-    for (size_t m (0); m < rpLength - 1; m+=2) {
-        if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'c') {
-            group.updatePayoffByIndex(m, rewardForCooperation);
-            group.updatePayoffByIndex(m+1, rewardForCooperation); //case 1, both cooperate
-            taxPool += 2 * T * (rewardForCooperation);
-        }
-        else if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'd') {
-            group.updatePayoffByIndex(m, suckersPayoff);
-            group.updatePayoffByIndex(m+1, temptationToDefect); //case 2, p1 coop p2 defect
-            taxPool += T * (suckersPayoff + temptationToDefect);
-        }
-        else if (group.getAgents()[m].getTrait() == 'd' && group.getAgents()[m+1].getTrait() == 'd') {
-            group.updatePayoffByIndex(m, mutualPunishment);
-            group.updatePayoffByIndex(m+1, mutualPunishment); //case 3, both defect
-            taxPool += 2 * T * (mutualPunishment);
-        }
-        else {
-            group.updatePayoffByIndex(m, temptationToDefect);
-            group.updatePayoffByIndex(m+1, suckersPayoff); //reverse of case 2
-            taxPool += T * (suckersPayoff + temptationToDefect);
+    if (rpLength > 0) {
+
+        for (size_t m (0); m < rpLength - 1; m+=2) {
+
+            if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'c') {
+                group.updatePayoffByIndex(m, rewardForCooperation);
+                group.updatePayoffByIndex(m+1, rewardForCooperation); //case 1, both cooperate
+                taxPool += 2 * T * (rewardForCooperation);
+            }
+            else if (group.getAgents()[m].getTrait() == 'c' && group.getAgents()[m+1].getTrait() == 'd') {
+                group.updatePayoffByIndex(m, suckersPayoff);
+                group.updatePayoffByIndex(m+1, temptationToDefect); //case 2, p1 coop p2 defect
+                taxPool += T * (suckersPayoff + temptationToDefect);
+            }
+            else if (group.getAgents()[m].getTrait() == 'd' && group.getAgents()[m+1].getTrait() == 'd') {
+                group.updatePayoffByIndex(m, mutualPunishment);
+                group.updatePayoffByIndex(m+1, mutualPunishment); //case 3, both defect
+                taxPool += 2 * T * (mutualPunishment);
+            }
+            else {
+                group.updatePayoffByIndex(m, temptationToDefect);
+                group.updatePayoffByIndex(m+1, suckersPayoff); //reverse of case 2
+                taxPool += T * (suckersPayoff + temptationToDefect);
+            }
         }
     }
-
 
     float transfer = taxPool / group.getAgents().size();
 
@@ -468,7 +474,6 @@ int main() {
             Agent agent ('d', 0); //all agents begin defective and with 0 payoff
             world[currentlyFilling].addAgent(agent);
         }
-
         ++currentlyFilling;
     }
 
