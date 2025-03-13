@@ -8,6 +8,8 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 #include <random>
 #include <vector>
 #include <numeric>
+#include <algorithm>
+#include <iterator>
 
 /*
 Storage place for our beautiful boys (aka global constants)
@@ -51,7 +53,7 @@ public:
         return payoff;
     }
 
-    Agent operator= (const Agent &other) {
+    Agent operator= (Agent other) {
         Agent agent (other.getTrait(), other.getPayoff());
         return agent;
     }
@@ -435,7 +437,7 @@ int main() {
     /*
     now fill each group in the vector with a random number of agents from the pool
     NOTE: We will somehow need to make sure that if we get down to <4 agents we just put 4 agents in
-    the last group. Right now the last group doesn't have to have any agents.
+    the last group.
     */
     while (agentsRemaining > GROUP_SIZE_LOWER_BOUND) {
         /*
@@ -446,6 +448,7 @@ int main() {
         std::uniform_int_distribution<> d(4, groupSizeUpperBound);
 
         int numAgents (d(randomizer));
+        agentsRemaining -= numAgents;
 
         for (int k (0); k < numAgents; ++k) { //I am SURE there is a more efficient way of doing this
             Agent agent ('d', 0); //all agents begin defective and with 0 payoff
@@ -453,6 +456,16 @@ int main() {
         }
 
         ++currentlyFilling;
+    }
+
+    //make sure last group has some agents in it
+    size_t sizeOfLastGroup = world[world.size() - 1].getAgents().size();
+
+    if (sizeOfLastGroup < 4) { //evil physics student code
+        for (int s (0); s < (4 - sizeOfLastGroup); ++s) {
+            Agent agent ('d', 0);
+            world[world.size() - 1].addAgent(agent);
+        }
     }
 
     std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //how big is the war
@@ -463,12 +476,14 @@ int main() {
     float avgTRate;
     float avgSRate;
 
+
     if (!outf) {
         std::cerr << "Well, cock. Some C++ nonsense means the file output didn't work.\n";
         return 1;
     }
 
     outf << "Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate";
+
 
     int iterations = 1000; //how many times to repeat the simulation
     for (int j (0); j < iterations; ++j) { //Now run everything
