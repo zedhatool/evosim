@@ -11,6 +11,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 #include <algorithm>
 #include <iterator>
 #include <chrono>
+#include <map>
 
 /*
 Storage place for our beautiful boys (aka global constants)
@@ -21,7 +22,8 @@ const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
 const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
 const int AGENTS_MULTIPLIER = 20; //benchmark value is this is 20
 const int GROUP_SIZE_LOWER_BOUND = 4; //from BCH. Makes sense because that way there are 2 PD pairings
-
+const float BLACK_SWAN_CHANCE = 0.01;
+const float CONVERSION_CHANCE = 0.3; //about the prevalence of fascism in post crisis societies
 /*
 Define the structure of an agent
 */
@@ -123,6 +125,10 @@ public:
         return groupSize;
     }
 
+    void updateGroupSize() {
+        groupSize = agents.size();
+    }
+
     /*
     This method updates the two variables which are functions of the group data, rather than things we define;
     namely, it computes the total payoff and then updates the proportion of the group which is cooperative.
@@ -179,6 +185,15 @@ public:
     void addAgent(Agent a) {
         agents.push_back(a);
         groupSize++;
+    }
+
+    void removeAgentByIndex(int index) {
+        agents.erase(agents.begin() + index);
+        groupSize--;
+    }
+
+    void setTraitByIndex(int index, char newTrait) {
+        agents[index].setTrait(newTrait);
     }
 
     //this is giving some kind of strange error
@@ -459,6 +474,93 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
     } //group two wins
 }
 
+/*
+Extensions go down here
+*/
+/*
+    Migration: in every group G, each agent a has a probability to migrate based on the ratio of their payoff
+    with the group's total payoff. They randomly choose among groups with a higher total payoff than their own,
+    and migrate
+*/
+void migrate(std::vector<Group>& world) {
+    std::mt19937 randomizer;
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    randomizer.seed((unsigned long)seed);
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+    std::uniform_int_distribution<> d(0.0, world.size() - 1);
+    std::map <int, std::vector<int> > dict;
+    std::map<int, std::vector<int> >::iterator it;
+
+    for (int i = 0; i < world.size(); i++) {
+        std::vector<int> tempIndices;
+        Group group = world[i];
+        for (int j = 0; j < group.getSize(); j++) {
+            if (group.getAgents()[j].getPayoff() >= group.getTotalPayoff() / (float) group.getSize()) {
+                float chance = group.getAgents()[j].getPayoff() / group.getTotalPayoff();
+                int numMigrated = 0;
+                if (dis(randomizer) <= chance && group.getSize() - numMigrated > 4) {
+                    tempIndices.push_back(j);
+                    int randIndex = d(randomizer);
+                    if (randIndex != j) {
+                       world[randIndex].addAgent(group.getAgents()[j]);
+                    }
+                    numMigrated++;
+                }
+            }
+        }
+        dict[i] = tempIndices;
+    }
+
+    for (int p (0); p < world.size(); ++p) {
+        world[p].updateGroupData();
+    }
+
+    for (it = dict.begin(); it != dict.end(); it++) {
+        Group group = world[it->first];
+        std::vector<int> a = it->second;
+        int j = 0;
+        for (int i = 0; i < a.size(); i++) {
+            group.removeAgentByIndex(a[i-j]);
+            j++;
+        }
+    }
+}
+
+void lightningEmoji(std::vector<Group>& world) {
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    std::mt19937 randomizer;
+    randomizer.seed((unsigned long)seed);
+
+    std::uniform_real_distribution<> defect(0.0, 0.5);
+    std::uniform_real_distribution<> coop(0.0, 1.0); //percentage of payoff that we take
+
+    float price = 0;
+    float conversion = 0;
+    float haircut = 0;
+
+    for (int i (0); i < world.size(); ++i) {
+        haircut  = coop(randomizer);
+        world[i].setInstitutions(haircut * world[i].getTaxRate(), haircut * world[i].getSegRate());
+        for (int j (0); j < world[i].getSize(); ++j) {
+            price = 0;
+            conversion = coop(randomizer);
+            if (world[i].getAgents()[j].getTrait() == 'c' && conversion <= CONVERSION_CHANCE) {
+                price = coop(randomizer);
+                world[i].updatePayoffByIndex(j, (1 - price) * world[i].getAgents()[j].getPayoff());
+                world[i].setTraitByIndex(j, 'd');
+            }
+            else if (world[i].getAgents()[j].getTrait() == 'c' && conversion > CONVERSION_CHANCE) {
+                price = coop(randomizer);
+                world[i].updatePayoffByIndex(j, (1 - price) * world[i].getAgents()[j].getPayoff());
+            }
+            else {
+                price = defect(randomizer);
+                world[i].updatePayoffByIndex(j, (1 - price) * world[i].getAgents()[j].getPayoff());
+            }
+        }
+    }
+}
+
 int main() {
     /*
     Getting the main simulation up and running
@@ -471,6 +573,7 @@ int main() {
     std::mt19937 randomizer;
     randomizer.seed((unsigned long)seed);
 
+    std::uniform_real_distribution<> dis(0.0, 1.0);
     std::poisson_distribution<> pois(AGENTS_MULTIPLIER); //Poisson noise
     int totalAgents (0);
 
@@ -500,18 +603,18 @@ int main() {
     float pCoop;
     float avgTRate;
     float avgSRate;
-
+    float shock;
 
     if (!outf) {
         std::cerr << "Well, cock. Some C++ nonsense means the file output didn't work.\n";
         return 1;
     }
 
-    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate" << std::endl;
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock" << std::endl;
 
 
     int iterations; //how many times to repeat the simulation
-    std::cout << "How many interations?" << std::endl; //quality of life
+    std::cout << "How many iterations?" << std::endl; //quality of life
     std::cin >> iterations;
 
     for (int j (0); j < iterations; ++j) { //Now run everything
@@ -520,10 +623,17 @@ int main() {
         pCoop = 0;
         avgTRate = 0;
         avgSRate = 0;
+        shock = 0;
 
             for (int k (0); k < INITIAL_GROUPS; ++k) { //Within-group phases
             playWithinGroup(world[k]);
+            //migrate(world);
             haveChildren(world[k]);
+            }
+
+            if (dis(randomizer) <= BLACK_SWAN_CHANCE) { //we have a black swan event
+                lightningEmoji(world);
+                shock = 1;
             }
 
             //for the war, shuffle the world and choose the first warSize groups
@@ -555,7 +665,7 @@ int main() {
         avgTRate /= (float) INITIAL_GROUPS;
         avgSRate /= (float) INITIAL_GROUPS;
 
-        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << std::endl;
 
         }
         outf.close();
