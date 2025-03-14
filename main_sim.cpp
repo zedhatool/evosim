@@ -16,7 +16,7 @@ https://sites.santafe.edu/~bowles/artificial_history/algorithm_coevolution.htm
 Storage place for our beautiful boys (aka global constants)
 */
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
-const float INDIVIDUAL_MUTATION_RATE (0.1); //benchmark from BCH, will need to do parameter search
+const float INDIVIDUAL_MUTATION_RATE (0.005); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
 const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
 const int INITIAL_AGENTS = 20 * INITIAL_GROUPS; //benchmark value is this is 20*INITIAL_GROUPS
@@ -302,7 +302,7 @@ void playWithinGroup(Group& group) {
         }
     }
 
-    float transfer = taxPool / group.getAgents().size();
+    float transfer = taxPool / (float) group.getAgents().size();
 
     for (size_t n (0); n < length; ++n) {
         group.transferByIndex(n, transfer); //add transfer amount to everyone in the group's payoff
