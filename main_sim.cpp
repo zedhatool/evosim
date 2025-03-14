@@ -19,7 +19,7 @@ const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have 
 const float INDIVIDUAL_MUTATION_RATE (0.005); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
 const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
-const int INITIAL_AGENTS = 20 * INITIAL_GROUPS; //benchmark value is this is 20*INITIAL_GROUPS
+const int AGENTS_MULTIPLIER = 20; //benchmark value is this is 20
 const int GROUP_SIZE_LOWER_BOUND = 4; //from BCH. Makes sense because that way there are 2 PD pairings
 
 /*
@@ -370,11 +370,11 @@ void haveChildren(Group& group) {
     int flips = twoCoin(randomizer);
     float institutionalChange = dis(randomizer);
 
-    if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 0) {//1 = heads, increase
+    if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 0 && group.getTaxRate() <= 0.9 && group.getSegRate() <= 0.4) {//1 = heads, increase
         group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() + 0.1);
-    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1 && group.getSegRate() >= 0.1) {
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 1 && group.getSegRate() >= 0.1 && group.getTaxRate() <= 0.9) {
         group.setInstitutions(group.getTaxRate() + 0.1, group.getSegRate() - 0.1);
-    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 2  && group.getTaxRate() >= 0.1) {
+    } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 2  && group.getTaxRate() >= 0.1 && group.getSegRate() <= 0.4) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() + 0.1);
     } else if (institutionalChange <= INSTITUTIONAL_CHANGE_CHANCE && flips == 3 && group.getSegRate() >= 0.1 && group.getTaxRate() >= 0.1) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
@@ -387,6 +387,8 @@ Define how the game works for groups. Note that not every group participates in 
 with chance GROUP_CONFLICT_CHANCE (defined way above)
 */
 void playGroupGame(Group& groupOne, Group& groupTwo) {
+    std::mt19937 randomizer;
+
     float payoffOne (groupOne.getTotalPayoff());
     float payoffTwo (groupTwo.getTotalPayoff());
     std::vector<Agent> pool;
@@ -394,16 +396,15 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
     if (payoffOne >= payoffTwo) {//arbitrarily break ties in favor of group 1. randomize going forward?
         groupTwo.setInstitutions(groupOne.getTaxRate(), groupOne.getSegRate()); //group 2 gets 1's institutions
 
-        size_t poolSize (groupTwo.getAgents().size());
-        size_t numCoop = poolSize * (size_t) groupOne.getPropCoop();
+        size_t numCoopTwo = (size_t) ((float) groupTwo.getSize() * groupOne.getPropCoop());
 
-        /*
-            We generate a bunch of agents which look like those in group one and repopulate group 2 with
-            the new agents
-        */
-        for (size_t i (0); i < poolSize; ++i) {
-            if (i < numCoop) {
-                Agent agent('c', 0);
+        //generate the enlarged pool to split between groups
+        for (size_t i(0); i < groupOne.getSize() + groupTwo.getSize(); ++i) {
+            if (i < groupOne.getSize()) {
+                pool.push_back(groupOne.getAgents()[i]);
+            }
+            else if (i >= groupOne.getSize() && i < groupOne.getSize() + numCoopTwo) {
+                Agent agent ('c', 0);
                 pool.push_back(agent);
             }
             else {
@@ -411,22 +412,32 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
                 pool.push_back(agent);
             }
         }
-        groupTwo.overhaulAgents(pool);
-        groupTwo.updateGroupData();
+
+    int poolSize (pool.size());
+    std::uniform_int_distribution<> uniZ(4, poolSize - 4);
+
+    int sizeTwo = uniZ(randomizer); //pick a random index to split groups 1 and 2
+
+    //split groups randomly, I think
+    groupOne.overhaulAgents(std::vector<Agent>(pool.begin(), pool.end() - sizeTwo));
+    groupTwo.overhaulAgents(std::vector<Agent>(pool.end() - sizeTwo, pool.end()));
+
+    groupOne.updateGroupData();
+    groupTwo.updateGroupData();
+
     } //group one wins
     else {
         groupOne.setInstitutions(groupTwo.getTaxRate(), groupOne.getTaxRate());
 
-        size_t poolSize (groupOne.getAgents().size());
-        size_t numCoop = poolSize * (size_t) groupTwo.getPropCoop();
+        size_t numCoopOne = (size_t) ((float) groupOne.getSize() * groupTwo.getPropCoop());
 
-        /*
-            We generate a bunch of agents which look like those in group one and repopulate group 2 with
-            the new agents
-        */
-        for (size_t i (0); i < poolSize; ++i) {
-            if (i < numCoop) {
-                Agent agent('c', 0);
+        //generate the enlarged pool to split between groups
+        for (size_t i(0); i < groupOne.getSize() + groupTwo.getSize(); ++i) {
+            if (i < groupTwo.getSize()) {
+                pool.push_back(groupTwo.getAgents()[i]);
+            }
+            else if (i >= groupTwo.getSize() && i < groupOne.getSize() + numCoopOne) {
+                Agent agent ('c', 0);
                 pool.push_back(agent);
             }
             else {
@@ -434,8 +445,17 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
                 pool.push_back(agent);
             }
         }
-        groupOne.overhaulAgents(pool);
+
+        int poolSize (pool.size());
+        std::uniform_int_distribution<> uniZ(4, poolSize - 4);
+
+        int sizeOne = uniZ(randomizer); //pick a random index to split groups 1 and 2
+
+        //split groups randomly, I think
+        groupTwo.overhaulAgents(std::vector<Agent>(pool.begin(), pool.end() - sizeOne));
+        groupOne.overhaulAgents(std::vector<Agent>(pool.end() - sizeOne, pool.end()));
         groupOne.updateGroupData();
+        groupTwo.updateGroupData();
     } //group two wins
 }
 
@@ -445,53 +465,32 @@ int main() {
     */
 
     //Start by creating a vector of groups
-    std::vector<Group> world (INITIAL_GROUPS);
-
-    for (int i (0); i < INITIAL_GROUPS; ++i) {
-        // propCoop, taxRate, segRate, totalPayoff, groupSize
-        Group group (0, 0, 0, 0, 0); //setting groups to be of zero size for a second
-
-    }
-
-    int agentsRemaining = INITIAL_AGENTS;
+    std::vector<Group> world;
 
     auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::mt19937 randomizer;
     randomizer.seed((unsigned long)seed);
 
-    int currentlyFilling (0);
+    std::poisson_distribution<> pois(AGENTS_MULTIPLIER); //Poisson noise
+    int totalAgents (0);
 
-    /*
-    now fill each group in the vector with a random number of agents from the pool
-    NOTE: We will somehow need to make sure that if we get down to <4 agents we just put 4 agents in
-    the last group.
-    */
-    while (agentsRemaining > GROUP_SIZE_LOWER_BOUND) {
-        /*
-        Every group needs to be of size 4, so no group can be larger than the number of agents remaining
-        minus 4 times the number of groups remaining
-        */
-        int groupSizeUpperBound (agentsRemaining - GROUP_SIZE_LOWER_BOUND * (INITIAL_GROUPS - currentlyFilling));
-        std::uniform_int_distribution<> d(4, groupSizeUpperBound);
+    for (int i (0); i < INITIAL_GROUPS; ++i) {
+        // propCoop, taxRate, segRate, totalPayoff, groupSize
+        Group group (0, 0, 0, 0, 0); //setting groups to be of zero size for a second
+        int numAgents = pois(randomizer); //average group size is 20, but with Poisson noise
 
-        int numAgents (d(randomizer));
-        agentsRemaining -= numAgents;
-
-        for (int k (0); k < numAgents; ++k) { //I am SURE there is a more efficient way of doing this
-            Agent agent ('d', 0); //all agents begin defective and with 0 payoff
-            world[currentlyFilling].addAgent(agent);
+        if (numAgents < 4) {
+            numAgents = 4;
+            totalAgents += 4;
         }
-        ++currentlyFilling;
-    }
 
-    //make sure last group has some agents in it
-    size_t sizeOfLastGroup = world[world.size() - 1].getAgents().size();
-
-    if (sizeOfLastGroup < 4) { //evil physics student code
-        for (int s (0); s < (4 - sizeOfLastGroup); ++s) {
+        for (int i (0); i < numAgents; ++i) {
             Agent agent ('d', 0);
-            world[world.size() - 1].addAgent(agent);
+            group.addAgent(agent);
+            totalAgents++;
         }
+
+        world.push_back(group);
     }
 
     std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //how big is the war
@@ -511,7 +510,10 @@ int main() {
     outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate" << std::endl;
 
 
-    int iterations = 1000; //how many times to repeat the simulation
+    int iterations; //how many times to repeat the simulation
+    std::cout << "How many interations?" << std::endl; //quality of life
+    std::cin >> iterations;
+
     for (int j (0); j < iterations; ++j) { //Now run everything
 
         //reset output values
