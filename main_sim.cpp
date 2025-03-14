@@ -59,9 +59,10 @@ public:
         return payoff;
     }
 
-    Agent operator= (Agent other) {
-        Agent agent (other.getTrait(), other.getPayoff());
-        return agent;
+    Agent& operator= (const Agent& other) {
+        trait = other.getTrait();
+        payoff = other.getPayoff();
+        return *this;
     }
 };
 
@@ -333,13 +334,13 @@ void haveChildren(Group& group) {
     //This defines a probability mass function on subintervals given by the indices of agents
     std::piecewise_constant_distribution<> d(subintervals.begin(), subintervals.end(), weights.begin());
 
-    size_t sexHavers = 0;
+    int sexHavers = 0;
 
     std::vector<Agent> childPool;
 
     while (sexHavers < groupSize) {
         float randResult = d(randomizer);
-        size_t randIndex = (size_t) randResult;
+        int randIndex = (int) randResult;
         Agent agent = group.getAgents()[randIndex];
         float mutation = dis(randomizer);
 
@@ -357,6 +358,7 @@ void haveChildren(Group& group) {
     }
 
     group.overhaulAgents(childPool);
+    group.updateGroupData();
 
     std::uniform_int_distribution<> twoCoin(0, 3);
     /*
