@@ -19,6 +19,7 @@ Storage place for our beautiful boys (aka global constants)
 const float GROUP_CONFLICT_CHANCE (0.25); //value from BCH. We may need to have this vary over time, see fig 5
 const float INDIVIDUAL_MUTATION_RATE (0.005); //benchmark from BCH, will need to do parameter search
 const float INSTITUTIONAL_CHANGE_CHANCE (0.1); //benchmark from BCH
+const float PUNISHMENT_CHANGE_CHANCE (0.001); //choosing a low value for now
 const int INITIAL_GROUPS = 100; //I randomly chose ten. We can change this later
 const int AGENTS_MULTIPLIER = 20; //benchmark value is this is 20
 const int GROUP_SIZE_LOWER_BOUND = 4; //from BCH. Makes sense because that way there are 2 PD pairings
@@ -230,6 +231,10 @@ public:
     bool hasPunishment(){
         return willPunish;
     } 
+
+    void setPunishment(bool punish) {
+        willPunish = punish;
+    }
 };
 
 
@@ -445,6 +450,15 @@ void haveChildren(Group& group) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
     }
 
+    int flips = twoCoin(randomizer);
+    float punishmentChange = dis(randomizer);
+
+    if (punishmentChange <= PUNISHMENT_CHANGE_CHANCE && !group.hasPunishment()) {
+        group.setPunishment(true);
+    }
+    else if (punishmentChange <= PUNISHMENT_CHANGE_CHANCE && group.hasPunishment()) {
+        group.setPunishment(false);
+    }
 }
 
 /*
@@ -460,6 +474,7 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
 
     if (payoffOne >= payoffTwo) {//arbitrarily break ties in favor of group 1. randomize going forward?
         groupTwo.setInstitutions(groupOne.getTaxRate(), groupOne.getSegRate()); //group 2 gets 1's institutions
+        groupTwo.setPunishment(groupOne.hasPunishment()); //group 2 gets 1's punishment regime
 
         size_t numCoopTwo = (size_t) ((float) groupTwo.getSize() * groupOne.getPropCoop());
 
@@ -493,6 +508,7 @@ void playGroupGame(Group& groupOne, Group& groupTwo) {
     } //group one wins
     else {
         groupOne.setInstitutions(groupTwo.getTaxRate(), groupOne.getTaxRate());
+        groupOne.setPunishment(groupTwo.hasPunishment());
 
         size_t numCoopOne = (size_t) ((float) groupOne.getSize() * groupTwo.getPropCoop());
 
