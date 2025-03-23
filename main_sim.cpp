@@ -82,6 +82,7 @@ public:
     float taxRate; //Proportion of an agent's payoff which is redistributed to the group
     float segmentationRate; //Chance an agent is matched with their own type. Gives some spatial structure
     float totalPayoff; // total (not average!) payoff of agents in the group
+    bool willPunish; // have not implemented the mechanism yet but I suppose we could implement this as a mutation (that would be the next step)
     size_t groupSize;
     std::vector<Agent> agents;
 
@@ -91,6 +92,7 @@ public:
       taxRate = tRate;
       segmentationRate = sRate;
       totalPayoff = tPayoff;
+      willPunish = false;
       groupSize = gSize;
       initAgents(groupSize);
     }
@@ -224,6 +226,10 @@ public:
     void overhaulAgents(std::vector<Agent> newAgents) {
         agents = newAgents;
     }
+
+    bool hasPunishment(){
+        return willPunish;
+    } 
 };
 
 
@@ -238,6 +244,50 @@ void playWithinGroup(Group& group) {
     float mutualPunishment = 0.3; //P
     float taxPool = 0;
     float T = group.getTaxRate();
+    float punishDefectorsCost = (temptationToDefect - rewardForCooperation); //v 
+    float maxPunishProportion = 0.1; // Maximum proportion of individual payoff allocated to group punishment; 
+    float groupPunishmentPool = 0.0; // Pool allocated to punishing cooperators;
+
+    //Group Punishment 
+    
+    /*
+    Apologies for not knowing the full picture of the rest of the model. As our model for group-based punishment
+    involves subtracting a term from T (essentially) to bring it closer to R, I think we should be putting the
+    relevant code before the rest of the stuff happens. But I'm not sure if the individual agents will have their
+    payoffs yet? My current thinking is to assume for sake of simplicity that all cooperators will either contribute
+    a fixed amount v to the pool (calculated so that T is reduced to equal R if every cooperator pays) or, should
+    v be too great a proportion of their own payoff, contribute nothing. Eventually, the value of the total 
+    'punishment pool' is subtracted from T to represent how punishment diminishes the potential gains of defection
+    when averaging over the entire population (in reality, some defectors may be caught and others may not be, etc.).
+    In theory, we could have this upper limit of contribution to the punishment pool vary at the group level as
+    part of its institutions, instead of the current on-off switch. So we replace the current hasPunishment() with
+    a group level version of maxPunishProportion. We could also add some way to allow T dip below T at a high cost
+    to the cooperators but I'm not sure how to make that work with the rest of the model.
+    */
+    
+    if (group.getPropCoop() != 0.0 && group.hasPunishment()) {
+        punishDefectorsCost *= (1.0 - group.getPropCoop())/group.getPropCoop(); 
+        for (size_t i (0); i < group.getSize(); ++i) {
+            if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i].getPayoff()*maxPunishProportion >= punishDefectorsCost) {
+                float startingPayoff = group.getAgents()[i].getPayoff();
+                groupPunishmentPool += punishDefectorsCost;
+                group.getAgents()[i].setPayoff(startingPayoff - punishDefectorsCost); //updatePayoffByAgent()?
+            }
+        }
+    }
+
+    temptationToDefect -= groupPunishmentPool;
+
+    /*
+    I know this is very rough at the moment. So far I've tried to implement the model we initially sketched out in 
+    the draft of the paper. I do wonder if it would be more simple computationally if we just had a group level
+    punish() method that takes some cost out of the group pool to 'confiscate' (expropriate?) the wealth of defectors
+    with some efficiency proportional to the cost. Let's assume that this occurs at a loss, but nonetheless manages to
+    reduces the total payout recieved by the defectors. Maybe this is actually more complex to compute, I don't know, but
+    seems like it would be less computationally taxing than taking money at the individual level (which I guess is 
+    duplicating the taxation feature?). If we do change to this version of punishment, we would calculate this step
+    before the transfer step.
+    */
 
     /*
     Randomness in pairings. Create three pools, then randomize the third pool and play the game within
