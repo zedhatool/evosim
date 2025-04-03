@@ -507,7 +507,7 @@ int main() {
         return 1;
     }
 
-    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate" << std::endl;
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Conflict Chance" << std::endl;
 
 
     int iterations; //how many times to repeat the simulation
@@ -579,7 +579,7 @@ int main() {
         avgTRate /= (float) INITIAL_GROUPS;
         avgSRate /= (float) INITIAL_GROUPS;
 
-        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << conflictChance[j] << std::endl;
 
         }
         outf.close();
