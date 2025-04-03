@@ -596,7 +596,7 @@ int main() {
         world.push_back(group);
     }
 
-    std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //how big is the war
+    //std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //deprecated
 
     //define the file output stuff
     std::ofstream outf ("data.csv");
@@ -610,14 +610,38 @@ int main() {
         return 1;
     }
 
-    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock" << std::endl;
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock,Conflict Chance" << std::endl;
 
 
     int iterations; //how many times to repeat the simulation
     std::cout << "How many iterations?" << std::endl; //quality of life
     std::cin >> iterations;
 
+    std::vector<float> conflictChance;
+    conflictChance.push_back(GROUP_CONFLICT_CHANCE);
+
+    std::uniform_real_distribution<> sigma(-0.02, 0.02);
+
+    //auto-regressive group conflict chance
+    float averageConflictChance (0);
+    float currentConflictChance;
+    for (int m (1); m < iterations; ++m) {
+        currentConflictChance = 0.99 * conflictChance[m - 1] + sigma(randomizer);
+        conflictChance.push_back(currentConflictChance);
+        averageConflictChance += currentConflictChance;
+    }
+
+    averageConflictChance /= iterations;
+
+    float conflictChanceCorrection = GROUP_CONFLICT_CHANCE - averageConflictChance;
+
+    for (int n (0); n < iterations; ++n) {
+        conflictChance[n] += conflictChanceCorrection;
+    }
+
     for (int j (0); j < iterations; ++j) { //Now run everything
+
+        std::binomial_distribution<> war(INITIAL_GROUPS, GROUP_CONFLICT_CHANCE);
 
         //reset output values
         pCoop = 0;
@@ -665,7 +689,7 @@ int main() {
         avgTRate /= (float) INITIAL_GROUPS;
         avgSRate /= (float) INITIAL_GROUPS;
 
-        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << "," << conflictChance[j] << std::endl;
 
         }
         outf.close();
