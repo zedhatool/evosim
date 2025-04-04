@@ -36,16 +36,19 @@ float getDiffusion(float c) {
 int main() {
     //Xf = 1
     int Tf;
+
     std::cout << "How Long to run the model?" << std::endl;
     std::cin >> Tf;
 
     float dt (0.01);
     float dx (0.01);
 
-    int xPoints = 1 + (int) (1 / dx);
-    int tPoints = 1 + (int) (Tf / dt); //I added 1 + [...] thinking it would fix a segfault but it did not...
+    const int xPoints = (int) (1 / dx);
+    const int tPoints = (int) (Tf / dt);
 
-    float U[tPoints][xPoints]; //solution matrix
+
+    float* U[tPoints][xPoints]; //solution matrix
+
     float variance = 0.001;
     float mean = 0.5;
 
@@ -104,5 +107,6 @@ int main() {
     }
 
     outf.close();
+
     return 0;
 }
