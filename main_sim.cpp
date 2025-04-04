@@ -494,10 +494,10 @@ void migrate(std::vector<Group>& world) {
     for (int i = 0; i < world.size(); i++) {
         std::vector<int> tempIndices;
         Group group = world[i];
+        int numMigrated = 0;
         for (int j = 0; j < group.getSize(); j++) {
             if (group.getAgents()[j].getPayoff() >= group.getTotalPayoff() / (float) group.getSize()) {
                 float chance = group.getAgents()[j].getPayoff() / group.getTotalPayoff();
-                int numMigrated = 0;
                 if (dis(randomizer) <= chance && group.getSize() - numMigrated > 4) {
                     tempIndices.push_back(j);
                     int randIndex = d(randomizer);
