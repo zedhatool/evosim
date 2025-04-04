@@ -61,7 +61,7 @@ int main() {
     float dHalfFTCSMinus (0);
     float dHalfFTCSPlus (0);
 
-    for (int t (1); t < tPoints; ++t) {
+    for (int t (0); t < tPoints; ++t) {
         for (int x (1); x < xPoints - 1; ++x) {
             //Lax-Wendroff Computation
             uhalfLaxPlus = 0.5 * (U[t][x + 1] + U[t][x]) - (dt / dx) * (U[t][x + 1] * getVelocity(x * dx + dx) - U[t][x] * getVelocity(x * dx));
