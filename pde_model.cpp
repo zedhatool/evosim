@@ -89,8 +89,10 @@ int main() {
 
 
             U[(t + 1) * xPoints + x] = U[t * xPoints + x] + 0.5 * (dt / (dx * dx)) *
-            (dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] + U[(t + 1) * xPoints + x - 1] - 2 * U[(t + 1) * xPoints + x]) -
-                dHalfCrankMinus * (U[t * xPoints + x + 1] + U[t * xPoints + x - 1] - 2 * U[t * xPoints + x]))
+            ((dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] - U[(t + 1) * xPoints + x])
+                - dHalfCrankMinus * (U[(t + 1) * xPoints + x] - U[(t + 1) * xPoints + x - 1])
+                - dHalfCrankPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x])
+                - dHalfCrankMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1])))
                 - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
 
         } //Now impose Neumann boundary condition
