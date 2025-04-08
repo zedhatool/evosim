@@ -676,7 +676,7 @@ int main() {
         return 1;
     }
 
-    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock" << std::endl;
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock,Punishment" << std::endl;
 
 
     int iterations; //how many times to repeat the simulation
