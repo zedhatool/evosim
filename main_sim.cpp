@@ -450,7 +450,6 @@ void haveChildren(Group& group) {
         group.setInstitutions(group.getTaxRate() - 0.1, group.getSegRate() - 0.1);
     }
 
-    int flips = twoCoin(randomizer);
     float punishmentChange = dis(randomizer);
 
     if (punishmentChange <= PUNISHMENT_CHANGE_CHANCE && !group.hasPunishment()) {
@@ -670,6 +669,7 @@ int main() {
     float avgTRate;
     float avgSRate;
     float shock;
+    float pPunish;
 
     if (!outf) {
         std::cerr << "Well, cock. Some C++ nonsense means the file output didn't work.\n";
@@ -690,6 +690,7 @@ int main() {
         avgTRate = 0;
         avgSRate = 0;
         shock = 0;
+        pPunish = 0;
 
             for (int k (0); k < INITIAL_GROUPS; ++k) { //Within-group phases
             playWithinGroup(world[k]);
@@ -717,12 +718,14 @@ int main() {
                     pCoop += (world[l].getPropCoop() + world[l+1].getPropCoop());
                     avgTRate += (world[l].getTaxRate() + world[l+1].getTaxRate());
                     avgSRate += (world[l].getSegRate() + world[l+1].getSegRate());
+                    pPunish += (static_cast<float>(world[l].hasPunishment())+static_cast<float>(world[l+1].hasPunishment()));
                     l += 2;
                 }
                 else {
                     pCoop += world[l].getPropCoop();
                     avgTRate += world[l].getTaxRate();
                     avgSRate += world[l].getSegRate();
+                    pPunish += static_cast<float>(world[l].hasPunishment());
                     ++l;
                 }
             }
@@ -730,8 +733,9 @@ int main() {
         pCoop /= (float) INITIAL_GROUPS;
         avgTRate /= (float) INITIAL_GROUPS;
         avgSRate /= (float) INITIAL_GROUPS;
+        pPunish /= (float) INITIAL_GROUPS;
 
-        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << "," << pPunish << std::endl;
 
         }
         outf.close();
