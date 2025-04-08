@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <array>
 
 /*
     Euler's number
@@ -21,6 +22,27 @@ const float P = 0.3; //Punishment for mutual defection
 const float V = 0.5;
 const float F = 1;
 
+void tridag(VecDoub_I &a, VecDoub_I &b, VecDoub_I &c, VecDoub_I &r, VecDoub_O &u) {
+    //Algorithm copied from Press et al. section 2.4
+    int j, n = a.size();
+    Doub bet;
+    VecDoub gam(n);
+    if (b[0] == 0.0) throw("Error 1 in tridag");
+
+    u[0] = r[0] / (bet = b[0]);
+
+    for (j = 1; j < n; ++j) {
+        gam[j] = c[j - 1] / bet;
+        bet = b[j] - a[j] * gam[j];
+
+        if (bet == 0.0) throw("Error 2 in tridag");
+        u[j] = (r[j] - a[j] * u[j - 1]) / bet;
+    }
+    for (j = (n-2); j>=0; j--) {
+        u[j] -= gam[j + 1] * u[j + 1];
+    }
+}
+
 // p_t = -(getVelocity)_c
 float getVelocity(float c) {
     return c * (1 - c) * (c * (R - T) + (1 - c) * (S - P));
@@ -39,16 +61,21 @@ int main() {
 
     std::cout << "How Long to run the model?" << std::endl;
     std::cin >> Tf; //getting rid of this for now so the model will run
-    //Tf = 1000;
+    //int Tf = 1000;
 
-    float dx (0.01);
-    float dt (0.001);
+    double dx (0.01);
+    double dt (0.1 * dx);
 
-    const int xPoints = (int) (1 / dx);
-    const int tPoints = (int) (Tf / dt);
+    int xPoints = (int) (1 / dx);
+    int tPoints = (int) (Tf / dt);
 
     //flatten the array so that we can use dynamic allocation
-    float* U = new float[tPoints * xPoints]; //dynamic-size solution matrix for if we let user define Tf
+    int len = (int) (Tf / (dx * dt));
+    std::vector<double> U (len);
+
+    for (int k (0); k < tPoints * xPoints; ++k) {
+        U[k] = 0;
+    }
 
     float mean;
     float variance;
@@ -62,14 +89,22 @@ int main() {
         U[y] = (1 / (std::sqrt(2 * PI * variance))) * std::pow(E, -0.5 * (y * dx - mean) * (y * dx - mean) / variance);
     }
 
-    float uhalfLaxPlus (0);
-    float uhalfLaxMinus (0);
-    float fhalfLaxPlus (0);
-    float fhalfLaxMinus (0);
-    float dHalfCrankMinus (0);
-    float dHalfCrankPlus (0);
+    double uhalfLaxPlus (0);
+    double uhalfLaxMinus (0);
+    double fhalfLaxPlus (0);
+    double fhalfLaxMinus (0);
+    double dHalfCrankMinus (0);
+    double dHalfCrankPlus (0);
 
-    for (int t (0); t < tPoints; ++t) {
+    /*
+    U[t * xPoints + x] + 0.5 * (dt / (dx * dx)) *
+    ((dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] - U[(t + 1) * xPoints + x])
+        - dHalfCrankMinus * (U[(t + 1) * xPoints + x] - U[(t + 1) * xPoints + x - 1])
+        - dHalfCrankPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x])
+        - dHalfCrankMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1]))) //our old, wrong scheme
+    */
+
+    for (int t (0); t < tPoints - 1; ++t) {
         for (int x (1); x < xPoints - 1; ++x) {
             //Lax-Wendroff Computation
             uhalfLaxPlus = 0.5 * (U[t * xPoints + x + 1] + U[t * xPoints + x])
@@ -87,13 +122,12 @@ int main() {
             dHalfCrankPlus = getDiffusion(x * dx + 0.5 * dx);
             dHalfCrankMinus = getDiffusion(x * dx - 0.5 * dx);
 
+            //Lax-Wendroff Step
+            U[(t + 1) * xPoints + x] =
+                U[t * xPoints + x] - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
 
-            U[(t + 1) * xPoints + x] = U[t * xPoints + x] + 0.5 * (dt / (dx * dx)) *
-            ((dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] - U[(t + 1) * xPoints + x])
-                - dHalfCrankMinus * (U[(t + 1) * xPoints + x] - U[(t + 1) * xPoints + x - 1])
-                - dHalfCrankPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x])
-                - dHalfCrankMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1])))
-                - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
+            //Crank-Nicolson Step
+            tridag()
 
         } //Now impose Neumann boundary condition
         U[tPoints * xPoints - 1] = U[tPoints * xPoints - 2]; //x = 1
@@ -119,13 +153,13 @@ int main() {
     for (int i (0); i < tPoints; ++i) {
         outf << i * dt << ",";
         for (int j (0); j < xPoints - 1; ++j) {
-            outf << U[i * xPoints + j] * dx << ",";
+            outf << U[i * xPoints + j] << ",";
         }
         outf << U[i * xPoints + xPoints - 1] << std::endl; // array possibly wack?
     }
 
     outf.close();
-    delete [] U;
+    //delete [] U;
 
     return 0;
 }
