@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cmath>
 #include <array>
+#include <map>
 
 /*
     Euler's number
@@ -22,11 +23,12 @@ const float P = 0.3; //Punishment for mutual defection
 const float V = 0.5;
 const float F = 1;
 
-void tridag(VecDoub_I &a, VecDoub_I &b, VecDoub_I &c, VecDoub_I &r, VecDoub_O &u) {
+void solveTriDiag(std::vector<double> &a, std::vector<double> &b, std::vector<double> &c, std::vector<double> &r, std::vector<double> &u) {
     //Algorithm copied from Press et al. section 2.4
-    int j, n = a.size();
-    Doub bet;
-    VecDoub gam(n);
+    int j;
+    int n = a.size();
+    double bet;
+    std::vector<double> gam(n);
     if (b[0] == 0.0) throw("Error 1 in tridag");
 
     u[0] = r[0] / (bet = b[0]);
@@ -59,79 +61,43 @@ int main() {
     //Xf = 1
     int Tf;
 
-    std::cout << "How Long to run the model?" << std::endl;
+    std::cout << "For how long should the model run?" << std::endl;
     std::cin >> Tf; //getting rid of this for now so the model will run
     //int Tf = 1000;
 
     double dx (0.01);
-    double dt (0.1 * dx);
 
     int xPoints = (int) (1 / dx);
-    int tPoints = (int) (Tf / dt);
+    std::vector<double> D (xPoints);
 
-    //flatten the array so that we can use dynamic allocation
-    int len = (int) (Tf / (dx * dt));
-    std::vector<double> U (len);
+    for (int p(0); p < xPoints; ++p) {
+        D[p] = getDiffusion(p * dx);
+    }
 
-    for (int k (0); k < tPoints * xPoints; ++k) {
-        U[k] = 0;
+    diffusion_max = std::max_element(D.begin(), D.end());
+
+    float dt = 0.5 * dx / (diffusion_max);
+
+    std::vector<double> U (xPoints); // state at time t
+    std::vector<double> V (xPoints); //state at time t + 1
+    std::vector<double> A (xPoints); //A = C in this problem, see solveTriDiag function
+    std::vector<double> B (xPoints);
+
+    for (int i (0); i < xPoints; ++i) {
+        A[i] = -1 * getDiffusion(i * dx) * dt / (dx * dx);
+        B[i] = (1 - 2 * A[i]);
     }
 
     float mean;
     float variance;
-    std::cout << "Define the mean of the initial Gaussian" << std::endl;
+    std::cout << "Define the mean of the initial Gaussian." << std::endl;
     std::cin >> mean;
-    std::cout << "And now its variance" << std::endl;
+    std::cout << "Define the variance of the initial Gaussian." << std::endl;
     std::cin >> variance;
 
-    //define initial condition for solution U, just using a sharp Gaussian for initial function
     for (int y (0); y < xPoints; ++y) {
-        U[y] = (1 / (std::sqrt(2 * PI * variance))) * std::pow(E, -0.5 * (y * dx - mean) * (y * dx - mean) / variance);
-    }
-
-    double uhalfLaxPlus (0);
-    double uhalfLaxMinus (0);
-    double fhalfLaxPlus (0);
-    double fhalfLaxMinus (0);
-    double dHalfCrankMinus (0);
-    double dHalfCrankPlus (0);
-
-    /*
-    U[t * xPoints + x] + 0.5 * (dt / (dx * dx)) *
-    ((dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] - U[(t + 1) * xPoints + x])
-        - dHalfCrankMinus * (U[(t + 1) * xPoints + x] - U[(t + 1) * xPoints + x - 1])
-        - dHalfCrankPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x])
-        - dHalfCrankMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1]))) //our old, wrong scheme
-    */
-
-    for (int t (0); t < tPoints - 1; ++t) {
-        for (int x (1); x < xPoints - 1; ++x) {
-            //Lax-Wendroff Computation
-            uhalfLaxPlus = 0.5 * (U[t * xPoints + x + 1] + U[t * xPoints + x])
-            - (dt / dx) *
-            (U[t * xPoints + x + 1] * getVelocity(x * dx + dx) - U[t * xPoints + x] * getVelocity(x * dx));
-
-            uhalfLaxMinus = 0.5 * (U[t * xPoints + x - 1] + U[t * xPoints + x])
-            - (dt / dx) *
-            (U[t * xPoints + x] * getVelocity(x * dx) - U[t * xPoints + x - 1] * getVelocity(x * dx - dx));
-
-            fhalfLaxPlus = uhalfLaxPlus * getVelocity(x * dx + 0.5 * dx);
-            fhalfLaxMinus = uhalfLaxMinus * getVelocity(x * dx - 0.5 * dx);
-
-            //FTCS Computation
-            dHalfCrankPlus = getDiffusion(x * dx + 0.5 * dx);
-            dHalfCrankMinus = getDiffusion(x * dx - 0.5 * dx);
-
-            //Lax-Wendroff Step
-            U[(t + 1) * xPoints + x] =
-                U[t * xPoints + x] - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
-
-            //Crank-Nicolson Step
-            tridag()
-
-        } //Now impose Neumann boundary condition
-        U[tPoints * xPoints - 1] = U[tPoints * xPoints - 2]; //x = 1
-        U[0] = U[1];
+        U[y] = (1 / std::sqrt(2 * PI * variance)) *
+            std::pow(E, -0.5 * (y * dx - mean) * (y * dx - mean) / variance);
     }
 
     //define the file output stuff
@@ -142,24 +108,44 @@ int main() {
         return 1;
     }
 
-    outf << "Time" << ",";
+    /*
+        Set up CSV header
+    */
 
-    for (int k (0); k < xPoints - 1; ++k) {
-        outf << k * dx << ",";
+    outf << "Time,";
+
+    for (int j(0); j < xPoints - 1; ++j) {
+        outf << j * dx << ",";
     }
 
     outf << 1 << std::endl;
 
-    for (int i (0); i < tPoints; ++i) {
-        outf << i * dt << ",";
-        for (int j (0); j < xPoints - 1; ++j) {
-            outf << U[i * xPoints + j] << ",";
+    double uHalfLaxPlus (0);
+    double uHalfLaxMinus (0);
+    double fHalfLaxPlus (0);
+    double fHalfLaxMinus (0);
+
+    int t (0);
+    while (t * dt < Tf) {
+        outf << t * dt << ",";
+        for (int x (1); x < xPoints; ++x) {
+            outf << U[x] << ",";
+            uHalfLaxPlus = 0.5 * (U[x + 1] + U[x])
+                - (dt / dx) * (getVelocity((x + 1) * dx) - getVelocity(x * dx));
+            uHalfLaxMinus = 0.5 * (U[x] + U[x - 1])
+                - (dt / dx) * (getVelocity(x * dx) - getVelocity((x - 1) * dx));
+            fHalfLaxPlus = uHalfLaxPlus * getVelocity((x + 0.5) * dx);
+            fHalfLaxMinus = uHalfLaxMinus * getVelocity((x - 0.5) * dx);
+
+            V[x] = U[x] - (dt / dx) * (fHalfLaxPlus - fHalfLaxMinus); //Lax Step
         }
-        outf << U[i * xPoints + xPoints - 1] << std::endl; // array possibly wack?
+        outf << std::endl;
+        solveTriDiag(A, B, A, U, V); //Crank-Nicolson step
+        U = V;
+        ++t;
     }
 
     outf.close();
-    //delete [] U;
 
     return 0;
 }
