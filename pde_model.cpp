@@ -81,7 +81,7 @@ int main() {
 
             U[(t + 1) * xPoints + x] = U[t * xPoints + x] + (dt / (dx * dx)) *
             (dHalfFTCSPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x]) - dHalfFTCSMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1]))
-            - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
+            - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus); // seems largely correct, but investigate
         }
     }
 
@@ -106,7 +106,7 @@ int main() {
         for (int j (0); j < xPoints - 1; ++j) {
             outf << U[i * xPoints + j] * dx << ",";
         }
-        outf << U[i * xPoints + xPoints - 1] << std::endl;
+        outf << U[i * xPoints + xPoints - 1] << std::endl; // array possibly wack?
     }
 
     outf.close();
