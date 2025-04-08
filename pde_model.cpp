@@ -41,8 +41,8 @@ int main() {
     std::cin >> Tf; //getting rid of this for now so the model will run
     //Tf = 1000;
 
-    float dt (0.01);
     float dx (0.01);
+    float dt (0.001);
 
     const int xPoints = (int) (1 / dx);
     const int tPoints = (int) (Tf / dt);
@@ -50,39 +50,52 @@ int main() {
     //flatten the array so that we can use dynamic allocation
     float* U = new float[tPoints * xPoints]; //dynamic-size solution matrix for if we let user define Tf
 
-    float variance = 0.001;
-    float mean = 0.5;
+    float mean;
+    float variance;
+    std::cout << "Define the mean of the initial Gaussian" << std::endl;
+    std::cin >> mean;
+    std::cout << "And now its variance" << std::endl;
+    std::cin >> variance;
 
     //define initial condition for solution U, just using a sharp Gaussian for initial function
-
     for (int y (0); y < xPoints; ++y) {
         U[y] = (1 / (std::sqrt(2 * PI * variance))) * std::pow(E, -0.5 * (y * dx - mean) * (y * dx - mean) / variance);
     }
-
 
     float uhalfLaxPlus (0);
     float uhalfLaxMinus (0);
     float fhalfLaxPlus (0);
     float fhalfLaxMinus (0);
-    float dHalfFTCSMinus (0);
-    float dHalfFTCSPlus (0);
+    float dHalfCrankMinus (0);
+    float dHalfCrankPlus (0);
 
     for (int t (0); t < tPoints; ++t) {
         for (int x (1); x < xPoints - 1; ++x) {
             //Lax-Wendroff Computation
-            uhalfLaxPlus = 0.5 * (U[t * xPoints + x + 1] + U[t * xPoints + x]) - (dt / dx) * (U[t * xPoints + x + 1] * getVelocity(x * dx + dx) - U[t * xPoints + x] * getVelocity(x * dx));
-            uhalfLaxMinus = 0.5 * (U[t * xPoints + x - 1] + U[t * xPoints + x]) - (dt / dx) * (U[t * xPoints + x - 1] * getVelocity(x * dx - dx) - U[t * xPoints + x] * getVelocity(x * dx));
+            uhalfLaxPlus = 0.5 * (U[t * xPoints + x + 1] + U[t * xPoints + x])
+            - (dt / dx) *
+            (U[t * xPoints + x + 1] * getVelocity(x * dx + dx) - U[t * xPoints + x] * getVelocity(x * dx));
+
+            uhalfLaxMinus = 0.5 * (U[t * xPoints + x - 1] + U[t * xPoints + x])
+            - (dt / dx) *
+            (U[t * xPoints + x] * getVelocity(x * dx) - U[t * xPoints + x - 1] * getVelocity(x * dx - dx));
+
             fhalfLaxPlus = uhalfLaxPlus * getVelocity(x * dx + 0.5 * dx);
             fhalfLaxMinus = uhalfLaxMinus * getVelocity(x * dx - 0.5 * dx);
 
             //FTCS Computation
-            dHalfFTCSPlus = getDiffusion(x * dx + 0.5 * dx);
-            dHalfFTCSMinus = getDiffusion(x * dx - 0.5 * dx);
+            dHalfCrankPlus = getDiffusion(x * dx + 0.5 * dx);
+            dHalfCrankMinus = getDiffusion(x * dx - 0.5 * dx);
 
-            U[(t + 1) * xPoints + x] = U[t * xPoints + x] + (dt / (dx * dx)) *
-            (dHalfFTCSPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x]) - dHalfFTCSMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1]))
-            - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
-        }
+
+            U[(t + 1) * xPoints + x] = U[t * xPoints + x] + 0.5 * (dt / (dx * dx)) *
+            (dHalfCrankPlus * (U[(t + 1) * xPoints + x + 1] + U[(t + 1) * xPoints + x - 1] - 2 * U[(t + 1) * xPoints + x]) -
+                dHalfCrankMinus * (U[t * xPoints + x + 1] + U[t * xPoints + x - 1] - 2 * U[t * xPoints + x]))
+                - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
+
+        } //Now impose Neumann boundary condition
+        U[tPoints * xPoints - 1] = U[tPoints * xPoints - 2]; //x = 1
+        U[0] = U[1];
     }
 
     //define the file output stuff
