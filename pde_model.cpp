@@ -119,7 +119,7 @@ int main() {
         for (int j (0); j < xPoints - 1; ++j) {
             outf << U[i * xPoints + j] * dx << ",";
         }
-        outf << U[i * xPoints + xPoints - 1] << std::endl;
+        outf << U[i * xPoints + xPoints - 1] << std::endl; // array possibly wack?
     }
 
     outf.close();
