@@ -38,7 +38,8 @@ int main() {
     int Tf;
 
     std::cout << "How Long to run the model?" << std::endl;
-    std::cin >> Tf;
+    std::cin >> Tf; //getting rid of this for now so the model will run
+    //Tf = 1000;
 
     float dt (0.01);
     float dx (0.01);
@@ -46,16 +47,18 @@ int main() {
     const int xPoints = (int) (1 / dx);
     const int tPoints = (int) (Tf / dt);
 
-
-    float* U[tPoints][xPoints]; //solution matrix
+    //flatten the array so that we can use dynamic allocation
+    float* U = new float[tPoints * xPoints]; //dynamic-size solution matrix for if we let user define Tf
 
     float variance = 0.001;
     float mean = 0.5;
 
     //define initial condition for solution U, just using a sharp Gaussian for initial function
+
     for (int y (0); y < xPoints; ++y) {
-        U[0][y] = (1 / (std::sqrt(2 * PI * variance))) * std::pow(E, -0.5 * (y - mean) * (y - mean) / variance);
+        U[y] = (1 / (std::sqrt(2 * PI * variance))) * std::pow(E, -0.5 * (y * dx - mean) * (y * dx - mean) / variance);
     }
+
 
     float uhalfLaxPlus (0);
     float uhalfLaxMinus (0);
@@ -67,8 +70,8 @@ int main() {
     for (int t (0); t < tPoints; ++t) {
         for (int x (1); x < xPoints - 1; ++x) {
             //Lax-Wendroff Computation
-            uhalfLaxPlus = 0.5 * (U[t][x + 1] + U[t][x]) - (dt / dx) * (U[t][x + 1] * getVelocity(x * dx + dx) - U[t][x] * getVelocity(x * dx));
-            uhalfLaxMinus = 0.5 * (U[t][x - 1] + U[t][x]) - (dt / dx) * (U[t][x-1] * getVelocity(x * dx - dx) - U[t][x] * getVelocity(x * dx));
+            uhalfLaxPlus = 0.5 * (U[t * xPoints + x + 1] + U[t * xPoints + x]) - (dt / dx) * (U[t * xPoints + x + 1] * getVelocity(x * dx + dx) - U[t * xPoints + x] * getVelocity(x * dx));
+            uhalfLaxMinus = 0.5 * (U[t * xPoints + x - 1] + U[t * xPoints + x]) - (dt / dx) * (U[t * xPoints + x - 1] * getVelocity(x * dx - dx) - U[t * xPoints + x] * getVelocity(x * dx));
             fhalfLaxPlus = uhalfLaxPlus * getVelocity(x * dx + 0.5 * dx);
             fhalfLaxMinus = uhalfLaxMinus * getVelocity(x * dx - 0.5 * dx);
 
@@ -76,8 +79,8 @@ int main() {
             dHalfFTCSPlus = getDiffusion(x * dx + 0.5 * dx);
             dHalfFTCSMinus = getDiffusion(x * dx - 0.5 * dx);
 
-            U[t + 1][x] = U[t][x] + (dt / (dx * dx)) *
-            (dHalfFTCSPlus * (U[t][x + 1] - U[t][x]) - dHalfFTCSMinus * (U[t][x] - U[t][x-1]))
+            U[(t + 1) * xPoints + x] = U[t * xPoints + x] + (dt / (dx * dx)) *
+            (dHalfFTCSPlus * (U[t * xPoints + x + 1] - U[t * xPoints + x]) - dHalfFTCSMinus * (U[t * xPoints + x] - U[t * xPoints + x - 1]))
             - (dt / dx) * (fhalfLaxPlus - fhalfLaxMinus);
         }
     }
@@ -92,21 +95,22 @@ int main() {
 
     outf << "Time" << ",";
 
-    for (int k (0); k < xPoints; ++k) {
+    for (int k (0); k < xPoints - 1; ++k) {
         outf << k * dx << ",";
     }
 
-    outf << std::endl;
+    outf << 1 << std::endl;
 
     for (int i (0); i < tPoints; ++i) {
         outf << i * dt << ",";
-        for (int j (0); j < xPoints; ++j) {
-            outf << j * dx << ",";
+        for (int j (0); j < xPoints - 1; ++j) {
+            outf << U[i * xPoints + j] * dx << ",";
         }
-        outf << std::endl;
+        outf << U[i * xPoints + xPoints - 1] << std::endl;
     }
 
     outf.close();
+    delete [] U;
 
     return 0;
 }
