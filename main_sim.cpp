@@ -281,7 +281,7 @@ void playWithinGroup(Group& group) {
         }
     }
 
-    temptationToDefect -= groupPunishmentPool;
+    temptationToDefect -= groupPunishmentPool / ((1 - group.getPropCoop()) * group.getSize());
 
     /*
     I know this is very rough at the moment. So far I've tried to implement the model we initially sketched out in
