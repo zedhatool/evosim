@@ -230,7 +230,7 @@ public:
 
     bool hasPunishment(){
         return willPunish;
-    } 
+    }
 
     void setPunishment(bool punish) {
         willPunish = punish;
@@ -249,19 +249,19 @@ void playWithinGroup(Group& group) {
     float mutualPunishment = 0.3; //P
     float taxPool = 0;
     float T = group.getTaxRate();
-    float punishDefectorsCost = (temptationToDefect - rewardForCooperation); //v 
-    float maxPunishProportion = 0.1; // Maximum proportion of individual payoff allocated to group punishment; 
+    float punishDefectorsCost = (temptationToDefect - rewardForCooperation); //v
+    float maxPunishProportion = 0.1; // Maximum proportion of individual payoff allocated to group punishment;
     float groupPunishmentPool = 0.0; // Pool allocated to punishing cooperators;
 
-    //Group Punishment 
-    
+    //Group Punishment
+
     /*
     Apologies for not knowing the full picture of the rest of the model. As our model for group-based punishment
     involves subtracting a term from T (essentially) to bring it closer to R, I think we should be putting the
     relevant code before the rest of the stuff happens. But I'm not sure if the individual agents will have their
     payoffs yet? My current thinking is to assume for sake of simplicity that all cooperators will either contribute
     a fixed amount v to the pool (calculated so that T is reduced to equal R if every cooperator pays) or, should
-    v be too great a proportion of their own payoff, contribute nothing. Eventually, the value of the total 
+    v be too great a proportion of their own payoff, contribute nothing. Eventually, the value of the total
     'punishment pool' is subtracted from T to represent how punishment diminishes the potential gains of defection
     when averaging over the entire population (in reality, some defectors may be caught and others may not be, etc.).
     In theory, we could have this upper limit of contribution to the punishment pool vary at the group level as
@@ -269,9 +269,9 @@ void playWithinGroup(Group& group) {
     a group level version of maxPunishProportion. We could also add some way to allow T dip below T at a high cost
     to the cooperators but I'm not sure how to make that work with the rest of the model.
     */
-    
+
     if (group.getPropCoop() != 0.0 && group.hasPunishment()) {
-        punishDefectorsCost *= (1.0 - group.getPropCoop())/group.getPropCoop(); 
+        punishDefectorsCost *= (1.0 - group.getPropCoop())/group.getPropCoop();
         for (size_t i (0); i < group.getSize(); ++i) {
             if (group.getAgents()[i].getTrait() == 'c' && group.getAgents()[i].getPayoff()*maxPunishProportion >= punishDefectorsCost) {
                 float startingPayoff = group.getAgents()[i].getPayoff();
@@ -284,12 +284,12 @@ void playWithinGroup(Group& group) {
     temptationToDefect -= groupPunishmentPool;
 
     /*
-    I know this is very rough at the moment. So far I've tried to implement the model we initially sketched out in 
+    I know this is very rough at the moment. So far I've tried to implement the model we initially sketched out in
     the draft of the paper. I do wonder if it would be more simple computationally if we just had a group level
     punish() method that takes some cost out of the group pool to 'confiscate' (expropriate?) the wealth of defectors
     with some efficiency proportional to the cost. Let's assume that this occurs at a loss, but nonetheless manages to
     reduces the total payout recieved by the defectors. Maybe this is actually more complex to compute, I don't know, but
-    seems like it would be less computationally taxing than taking money at the individual level (which I guess is 
+    seems like it would be less computationally taxing than taking money at the individual level (which I guess is
     duplicating the taxation feature?). If we do change to this version of punishment, we would calculate this step
     before the transfer step.
     */
@@ -661,7 +661,11 @@ int main() {
         world.push_back(group);
     }
 
-    std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //how big is the war
+    //std::binomial_distribution<> war (INITIAL_GROUPS, GROUP_CONFLICT_CHANCE); //deprecated
+
+    std::vector<float> conflictChance;
+    conflictChance.push_back(GROUP_CONFLICT_CHANCE);
+    std::uniform_real_distribution<> sigma(-0.02, 0.02);
 
     //define the file output stuff
     std::ofstream outf ("data.csv");
@@ -676,14 +680,33 @@ int main() {
         return 1;
     }
 
-    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock,Punishment" << std::endl;
+    outf << "Time,Proportion of Cooperators,Average Tax Rate,Average Segmentation Rate,Shock,Conflict Chance,Punishment" << std::endl;
 
 
     int iterations; //how many times to repeat the simulation
     std::cout << "How many iterations?" << std::endl; //quality of life
     std::cin >> iterations;
 
+    //auto-regressive group conflict chance
+    float averageConflictChance (0);
+    float currentConflictChance;
+    for (int m (1); m < iterations; ++m) {
+        currentConflictChance = 0.99 * conflictChance[m - 1] + sigma(randomizer);
+        conflictChance.push_back(currentConflictChance);
+        averageConflictChance += currentConflictChance;
+    }
+
+    averageConflictChance /= iterations;
+
+    float conflictChanceCorrection = GROUP_CONFLICT_CHANCE - averageConflictChance;
+
+    for (int n (0); n < iterations; ++n) {
+        conflictChance[n] += conflictChanceCorrection;
+    }
+
     for (int j (0); j < iterations; ++j) { //Now run everything
+
+        std::binomial_distribution<> war (INITIAL_GROUPS, conflictChance[j]);
 
         //reset output values
         pCoop = 0;
@@ -735,7 +758,8 @@ int main() {
         avgSRate /= (float) INITIAL_GROUPS;
         pPunish /= (float) INITIAL_GROUPS;
 
-        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << "," << pPunish << std::endl;
+        outf << j << "," << pCoop << "," << avgTRate << "," << avgSRate << "," << shock << ","
+        << conflictChance[j] << "," << pPunish << std::endl;
 
         }
         outf.close();
