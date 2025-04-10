@@ -520,7 +520,7 @@ void migrate(std::vector<Group>& world) {
         std::vector<int> a = it->second;
         int j = 0;
         for (int i = 0; i < a.size(); i++) {
-            group.removeAgentByIndex(a[i-j]);
+            group.removeAgentByIndex(a[i] - j);
             j++;
         }
     }
@@ -651,10 +651,9 @@ int main() {
 
             for (int k (0); k < INITIAL_GROUPS; ++k) { //Within-group phases
             playWithinGroup(world[k]);
-            //migrate(world);
             haveChildren(world[k]);
             }
-
+        migrate(world);
             if (dis(randomizer) <= BLACK_SWAN_CHANCE) { //we have a black swan event
                 lightningEmoji(world);
                 shock = 1;
