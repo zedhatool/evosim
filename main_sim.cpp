@@ -487,9 +487,23 @@ void migrate(std::vector<Group>& world) {
     auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     randomizer.seed((unsigned long)seed);
     std::uniform_real_distribution<> dis(0.0, 1.0);
-    std::uniform_int_distribution<> d(0.0, world.size() - 1);
     std::map <int, std::vector<int> > dict;
     std::map<int, std::vector<int> >::iterator it;
+    float total = 0;
+
+    for (size_t i = 0; i <= world.size(); ++i) {
+        subintervals.push_back(i);
+    }
+    for (size_t i = 0; i <= world.size(); ++i) {
+        total += world[i].getTotalPayoff();
+    }
+    for (size_t j = 0; j < world.size(); ++j) {
+        float pj = group.getTotalPayoff();
+        weights.push_back(pj / total);
+    }
+
+    //This defines a probability mass function on subintervals given by the indices of agents
+    std::piecewise_constant_distribution<> f(subintervals.begin(), subintervals.end(), weights.begin());
 
     for (int i = 0; i < world.size(); i++) {
         std::vector<int> tempIndices;
@@ -500,7 +514,7 @@ void migrate(std::vector<Group>& world) {
                 float chance = group.getAgents()[j].getPayoff() / group.getTotalPayoff();
                 if (dis(randomizer) <= chance && group.getSize() - numMigrated > 4) {
                     tempIndices.push_back(j);
-                    int randIndex = d(randomizer);
+                    int randIndex = f(randomizer);
                     if (randIndex != j) {
                        world[randIndex].addAgent(group.getAgents()[j]);
                     }
