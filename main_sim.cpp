@@ -489,6 +489,8 @@ void migrate(std::vector<Group>& world) {
     std::uniform_real_distribution<> dis(0.0, 1.0);
     std::map <int, std::vector<int> > dict;
     std::map<int, std::vector<int> >::iterator it;
+    std::vector<int> subintervals;
+    std::vector<float> weights;
     float total = 0;
 
     for (size_t i = 0; i <= world.size(); ++i) {
@@ -498,7 +500,7 @@ void migrate(std::vector<Group>& world) {
         total += world[i].getTotalPayoff();
     }
     for (size_t j = 0; j < world.size(); ++j) {
-        float pj = group.getTotalPayoff();
+        float pj = world[i].getTotalPayoff();
         weights.push_back(pj / total);
     }
 
