@@ -500,7 +500,7 @@ void migrate(std::vector<Group>& world) {
         total += world[i].getTotalPayoff();
     }
     for (size_t j = 0; j < world.size(); ++j) {
-        float pj = world[i].getTotalPayoff();
+        float pj = world[j].getTotalPayoff();
         weights.push_back(pj / total);
     }
 
